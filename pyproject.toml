@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mvs-deployment"
+version = "0.1.0"
+description = "Multi-camera (Hikrobot MVS) capture + tennis ball 3D localization utilities"
+readme = "readme.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "opencv-python",
+  "pyyaml",
+]
+
+[project.scripts]
+tennis3d-online = "tennis3d.apps.online_mvs_localize:main"
+tennis3d-offline = "tennis3d.apps.offline_localize_from_captures:main"
+tennis3d-fake-calib = "tennis3d.geometry.fake_calibration_cli:main"
+tennis3d-offline-detect = "tennis3d.offline.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]

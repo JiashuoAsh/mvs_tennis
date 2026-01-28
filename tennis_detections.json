@@ -1,0 +1,60 @@
+[
+  {
+    "base_ts_str": "20260120191532433",
+    "base_ts_epoch_ms": 1768936532433,
+    "matched": {
+      "MV-CS050-02(DA8199285)": {
+        "path": "C:\\Users\\woan\\MVS\\Data\\MV-CS050-02(DA8199285)\\Image_20260120191532433.bmp",
+        "ts_str": "20260120191532433",
+        "ts_epoch_ms": 1768936532433,
+        "delta_ms": 0
+      },
+      "MV-CS050-03(DA8199303)": {
+        "path": "C:\\Users\\woan\\MVS\\Data\\MV-CS050-03(DA8199303)\\Image_20260120191532400.bmp",
+        "ts_str": "20260120191532400",
+        "ts_epoch_ms": 1768936532400,
+        "delta_ms": -33
+      },
+      "MV-CS050-CTRL(DA8199402)": {
+        "path": "C:\\Users\\woan\\MVS\\Data\\MV-CS050-CTRL(DA8199402)\\Image_20260120191532430.bmp",
+        "ts_str": "20260120191532430",
+        "ts_epoch_ms": 1768936532430,
+        "delta_ms": -3
+      }
+    },
+    "detections": {
+      "MV-CS050-02(DA8199285)": [],
+      "MV-CS050-03(DA8199303)": [],
+      "MV-CS050-CTRL(DA8199402)": []
+    }
+  },
+  {
+    "base_ts_str": "20260120191534961",
+    "base_ts_epoch_ms": 1768936534961,
+    "matched": {
+      "MV-CS050-02(DA8199285)": {
+        "path": "C:\\Users\\woan\\MVS\\Data\\MV-CS050-02(DA8199285)\\Image_20260120191534961.bmp",
+        "ts_str": "20260120191534961",
+        "ts_epoch_ms": 1768936534961,
+        "delta_ms": 0
+      },
+      "MV-CS050-03(DA8199303)": {
+        "path": "C:\\Users\\woan\\MVS\\Data\\MV-CS050-03(DA8199303)\\Image_20260120191534918.bmp",
+        "ts_str": "20260120191534918",
+        "ts_epoch_ms": 1768936534918,
+        "delta_ms": -43
+      },
+      "MV-CS050-CTRL(DA8199402)": {
+        "path": "C:\\Users\\woan\\MVS\\Data\\MV-CS050-CTRL(DA8199402)\\Image_20260120191534948.bmp",
+        "ts_str": "20260120191534948",
+        "ts_epoch_ms": 1768936534948,
+        "delta_ms": -13
+      }
+    },
+    "detections": {
+      "MV-CS050-02(DA8199285)": [],
+      "MV-CS050-03(DA8199303)": [],
+      "MV-CS050-CTRL(DA8199402)": []
+    }
+  }
+]
