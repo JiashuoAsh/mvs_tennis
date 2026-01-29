@@ -1,8 +1,7 @@
-# MVS 四相机采集系统 - 项目文档
+# MVS_Deployment 代码库总结（mvs + tennis3d）
 
-**作者**：GitHub Copilot
-**最后更新**：2026 年 1 月
-**Python 版本**：3.8+
+**最后更新**：2026 年 1 月（已升级为多球鲁棒 3D 输出）
+**Python 版本**：3.10+（见 `pyproject.toml` 的 `requires-python`）
 
 ---
 
@@ -10,13 +9,15 @@
 
 1. [介绍与背景](#介绍与背景)
 2. [系统架构](#系统架构)
-3. [核心模块](#核心模块)
-4. [数据流与工作流](#数据流与工作流)
-5. [快速开始](#快速开始)
-6. [API 参考](#api-参考)
-7. [性能与优化](#性能与优化)
-8. [常见问题](#常见问题)
-9. [附录](#附录)
+3. [mvs：采集与组包核心模块](#mvs采集与组包核心模块)
+4. [tennis3d：检测 + 多球 3D 定位核心模块](#tennis3d检测--多球-3d-定位核心模块)
+5. [数据流与工作流](#数据流与工作流)
+6. [输出数据契约（JSONL）](#输出数据契约jsonl)
+7. [配置与运行方式](#配置与运行方式)
+8. [测试与开发](#测试与开发)
+9. [性能与优化](#性能与优化)
+10. [常见问题](#常见问题)
+11. [附录](#附录)
 
 ---
 
@@ -24,12 +25,19 @@
 
 ### 项目目标
 
-在 Python 环境下实现 4 台海康工业相机的**严格同步采集**：
+本仓库包含两条主线能力：
+
+1) 在 Python 环境下实现海康工业相机的**多相机同步采集与组包**（常见 2~4 路）：
 
 - 同一时刻 4 张图片（基于相同的触发事件）
 - 30fps 或更低帧率（取决于网络带宽）
 - 保存为 BMP/RAW，并记录精确时间戳
 - 用于后续的推理、处理或分析
+
+2) 在采集到的多相机图像上完成**网球检测 + 多球鲁棒三角化**，输出网球 3D 世界坐标（在线/离线均支持）：
+
+- 在线：`python -m tennis3d.apps.online_mvs_localize`（实时取流 → 检测 → 多球 3D → JSONL）
+- 离线：`python -m tennis3d.apps.offline_localize_from_captures`（读 captures/metadata.jsonl → 检测 → 多球 3D → JSONL）
 
 ### 核心挑战
 
@@ -42,7 +50,7 @@
 
 ### 技术栈
 
-- **语言**：Python 3.8+（类型提示、dataclass、async/await 支持）
+- **语言**：Python 3.10+（见 `pyproject.toml` 的 `requires-python`；类型提示、dataclass 等特性）
 - **SDK**：海康 MVS Python ctypes 示例绑定（MvImport）
 - **线程**：`threading` 进行异步取流与软触发
 - **时间**：`time.monotonic()` 用于性能统计，相机的 `dev_timestamp` 用于帧对齐
@@ -55,16 +63,18 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      应用层（CLI/推理）                        │
-│         tools/mvs_quad_capture.py  或 业务代码                 │
+│                      应用层（CLI）                           │
+│  采集：tools/mvs_quad_capture.py                              │
+│  在线 3D：python -m tennis3d.apps.online_mvs_localize          │
+│  离线 3D：python -m tennis3d.apps.offline_localize_from_captures│
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    mvs 包公共 API 层                           │
-│  • open_quad_capture() → QuadCapture 对象                    │
-│  • load_mvs_binding() → 延迟加载 MVS ctypes 绑定              │
-│  • save_frame_as_bmp() → SDK 保存 BMP                        │
+│                    mvs：采集与同步组包                         │
+│  • load_mvs_binding() → 延迟加载 MVS ctypes 绑定               │
+│  • open_quad_capture() → QuadCapture（取流 + 分组）            │
+│  • save_frame_as_bmp() → SDK 保存 BMP                         │
 └────────────────────────┬────────────────────────────────────┘
                          │
         ┌────────────────┼────────────────┐
@@ -102,6 +112,15 @@
       │  MvCameraControl.dll    │
       │  (硬件驱动库)            │
       └─────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │               tennis3d：检测 + 多相机几何 + 多球定位            │
+    │  • pipeline.sources: 在线/离线统一产出 (meta, images_by_camera) │
+    │  • detectors: fake/color/pt/rknn → detect(img)->list[Detection] │
+    │  • geometry: 标定/投影/DLT 三角化/重投影误差                     │
+    │  • localization: localize_balls（多球鲁棒匹配/去重/冲突消解）      │
+    │  • pipeline.core: run_localization_pipeline → 输出 JSONL         │
+    └─────────────────────────────────────────────────────────────┘
 ```
 
 ### 执行流（时序图）
@@ -135,7 +154,7 @@
 
 ---
 
-## 核心模块
+## mvs：采集与组包核心模块
 
 ### 1. binding.py - MVS 绑定加载
 
@@ -292,6 +311,81 @@ finally:
 
 ---
 
+## tennis3d：检测 + 多球 3D 定位核心模块
+
+`tennis3d` 是业务侧库：把每个相机的 2D 检测结果融合为 3D 世界坐标，并提供在线/离线两种入口。
+
+### 入口（apps）
+
+- 在线：`src/tennis3d/apps/online_mvs_localize.py`
+  - 从 `mvs.pipeline.open_quad_capture()` 实时取流并组包
+  - 调用 `tennis3d.pipeline.iter_mvs_image_groups()` 转为 `images_by_camera`
+  - 调用 `tennis3d.pipeline.run_localization_pipeline()` 输出 JSONL
+
+- 离线：`src/tennis3d/apps/offline_localize_from_captures.py`
+  - 读取 `captures_dir/metadata.jsonl` + 图像
+  - 调用 `tennis3d.pipeline.iter_capture_image_groups()` 产出同步组
+  - 其余流程与在线一致
+
+### 配置（config）
+
+配置模型位于 `src/tennis3d/config.py`，支持 `.json/.yaml/.yml`：
+
+- `OfflineAppConfig`：离线入口参数
+- `OnlineAppConfig`：在线入口参数（含 trigger 子配置）
+
+多球鲁棒定位相关的关键参数（会在本文后面的“配置与运行方式”与“输出契约”中再次说明）：
+
+- `require_views`：候选球至少需要多少个相机视角参与
+- `max_detections_per_camera`：每相机最多取 topK 个候选（抑制组合爆炸）
+- `max_reproj_error_px`：最大重投影误差阈值（像素）
+- `max_uv_match_dist_px`：投影补全匹配的最大像素距离阈值
+- `merge_dist_m`：3D 去重阈值（米）
+
+### 检测器适配（detectors）
+
+`src/tennis3d/detectors.py` 提供统一接口：
+
+- `create_detector(...)`：根据配置创建后端（fake/color/pt/rknn）
+- 统一方法：`detect(img_bgr) -> list[Detection]`
+
+检测输出数据结构：`src/tennis3d/offline/models.py::Detection`，包含 `bbox/score/cls` 与 `center` 计算属性。
+
+### 几何与标定（geometry）
+
+- `src/tennis3d/geometry/calibration.py`
+  - `load_calibration()`：读取 JSON/YAML 标定
+  - 外参约定：world→camera，$X_c = R_{wc} X_w + t_{wc}$
+  - 投影矩阵：$P = K [R_{wc}|t_{wc}]$
+
+- `src/tennis3d/geometry/triangulation.py`
+  - `triangulate_dlt()`：2~N 视角 DLT 三角化
+  - `reprojection_errors()`：重投影误差评估（像素）
+  - `project_point()`：用于投影补全匹配
+
+### 多球定位融合（localization）
+
+核心入口：`src/tennis3d/localization/localize.py::localize_balls()`。
+
+设计目标是解决实机常见问题：同一同步组里可能有多个球，同时检测器可能误检。为此采用“几何一致性优先”的策略：
+
+1) **两视角生成种子**：枚举两相机的 topK 检测组合，先用 DLT 得到 3D 种子。
+2) **投影补全匹配**：把 3D 点投影到其它相机，在其检测中心中找最近邻，且距离小于 `max_uv_match_dist_px` 才算匹配。
+3) **几何 gating**：对使用的视角计算重投影误差，若最大误差大于 `max_reproj_error_px` 则丢弃；并要求各视角深度为正。
+4) **3D 去重**：不同两视角组合可能得到同一球的重复解，用 `merge_dist_m` 做 3D-NMS 去重。
+5) **冲突消解**：同一相机同一 detection 不允许被多个 3D 球复用，按 `quality` 从高到低贪心选择。
+
+该过程最终输出 0..N 个 `BallLocalization`（按 `quality` 排序）。
+
+### 流水线编排（pipeline）
+
+- `src/tennis3d/pipeline/sources.py`
+  - 在线/离线统一产出 `(meta, images_by_camera)`
+- `src/tennis3d/pipeline/core.py`
+  - `run_localization_pipeline()`：每组做检测并调用 `localize_balls()`，输出可 JSON 序列化记录
+
+---
+
 ## 数据流与工作流
 
 ### 典型采集循环
@@ -361,9 +455,65 @@ for frame in group:
 
 ---
 
-## 快速开始
+## 输出数据契约（JSONL）
 
-### 环境配置
+`tennis3d.pipeline.run_localization_pipeline()` 的输出建议以 **JSONL** 落盘：
+
+- **一行 = 一个同步组**（同一次触发/同一组序列）
+- 每行都包含 `balls: [] | [ ... ]`
+  - `[]` 表示该组没有任何跨视角一致的 3D 解（可能误检过多、视角不足或不满足阈值）
+  - 列表长度为 N 表示该同步组里存在 N 个“几何一致”的球（多球场景）
+
+### 顶层字段
+
+- `created_at`: `float`，Unix epoch 秒（用于落盘时间，不等价于相机曝光时间）
+- `meta...`: 来自 source 的可序列化元信息
+  - 在线常见：`group_index`
+  - 离线常见：`group_seq` / `group_by` / `trigger_index`
+- `balls`: `list[dict]`
+
+### balls[*] 字段
+
+每个 ball dict 目前包含：
+
+- `ball_id`: `int`（在该同步组内的排序编号，按 `quality` 从高到低）
+- `ball_3d_world`: `[x, y, z]`（世界坐标，纯 Python float）
+- `ball_3d_camera`: `{serial: [x, y, z]}`（各相机坐标系下的 3D 点）
+- `used_cameras`: `list[str]`（参与三角化/验证的相机 serial 列表）
+- `quality`: `float`（综合质量评分，用于排序与冲突消解；值越大越好）
+- `num_views`: `int`（等价于 `len(used_cameras)`）
+- `median_reproj_error_px`: `float`（中位数重投影误差）
+- `max_reproj_error_px`: `float`（最大重投影误差，用于阈值 gating）
+- `reprojection_errors`: `list[dict]`
+  - 每项包含：`camera` / `uv` / `uv_hat` / `error_px`
+- `detections`（可选）：`{serial: {bbox, score, cls, center}}`
+  - 是否输出由 `include_detection_details` 控制
+
+### 示例（单行 JSONL，省略部分字段）
+
+```json
+{
+  "created_at": 1738212345.12,
+  "group_index": 12,
+  "balls": [
+    {
+      "ball_id": 0,
+      "ball_3d_world": [1.234, 0.567, 2.345],
+      "used_cameras": ["DA8199285", "DA8199303", "DA8199402"],
+      "quality": 0.91,
+      "num_views": 3,
+      "median_reproj_error_px": 1.8,
+      "max_reproj_error_px": 3.2
+    }
+  ]
+}
+```
+
+---
+
+## 配置与运行方式
+
+### 环境配置（MVS SDK 与 Python 环境）
 
 **Step 1：安装 MVS SDK**
 
@@ -371,6 +521,15 @@ for frame in group:
 
 ```bash
 set MVS_DLL_DIR=C:\Program Files\Hikvision\MVS\bin\win64
+```
+
+**Step 1.5：创建 Python 环境（推荐 uv）**
+
+仓库包含 `pyproject.toml` 与 `uv.lock`，推荐使用 uv 保持依赖一致。
+
+```bash
+uv venv
+uv sync
 ```
 
 **Step 2：配置网络**
@@ -420,7 +579,49 @@ python tools/mvs_quad_capture.py \
 
 ---
 
-## API 参考
+### 3D 定位（tennis3d）
+
+配置模板位于 `configs/` 与 `examples/configs/`，其中：
+
+- `configs/offline_*.yaml`：离线从 captures 跑定位
+- `configs/online_*.yaml`：在线边采集边定位
+
+#### 离线：从 captures/metadata.jsonl 输出多球 3D（JSONL）
+
+```bash
+python -m tennis3d.apps.offline_localize_from_captures --config configs/offline_pt_windows_cpu.yaml
+```
+
+常用输出文件会写到 `data/tools_output/`（可在 config 中修改 `out_jsonl`）。
+
+#### 在线：实时取流 → 检测 → 多球定位 → JSONL
+
+```bash
+python -m tennis3d.apps.online_mvs_localize --config configs/online_pt_windows_cpu_software_trigger.yaml
+```
+
+在线模式会通过 `mvs` 打开相机、分组，然后对每个同步组输出一行 JSONL（包含 `balls`）。
+
+---
+
+## 测试与开发
+
+### 运行测试
+
+本仓库使用 pytest，测试用例在 `tests/`：
+
+```bash
+pytest -q
+```
+
+覆盖重点包括：
+
+- 标定文件解析（YAML/JSON）
+- capture 元数据重排与路径稳健解析
+- DLT 三角化与几何一致性
+- **多球定位**：多球输出、误检抑制、冲突消解（同一 detection 不复用）
+
+### API 速查（mvs）
 
 ### mvs.binding
 
@@ -634,28 +835,21 @@ python tools/mvs_quad_capture.py --list
 
 ```
 MVS_Deployment/
-├── mvs/                        # 核心包
-│   ├── __init__.py
-│   ├── binding.py              # DLL 加载
-│   ├── devices.py              # 设备枚举
-│   ├── camera.py               # 相机生命周期
-│   ├── grab.py                 # 取流线程
-│   ├── grouping.py             # 分组器
-│   ├── soft_trigger.py         # 软触发
-│   ├── save.py                 # 保存 BMP
-│   ├── pipeline.py             # 管线
-│   └── README.md               # 包文档
-│
-├── tools/
-│   └── mvs_quad_capture.py     # CLI 工具
-│
-├── examples/
-│   └── quad_capture_demo.py    # 使用示例
-│
-├── docs/
-│   └── python-repository-overview.md  # 本文档
-│
-└── requirements.txt            # 依赖列表（如有）
+├── pyproject.toml                      # Python 项目元数据与依赖声明
+├── uv.lock                             # uv 锁定文件（推荐用 uv sync）
+├── src/
+│   ├── mvs/                            # 多相机采集与同步组包（ctypes 绑定 MVS SDK）
+│   └── tennis3d/                       # 检测 + 多相机几何 + 多球 3D 定位
+├── tools/                              # 工具脚本（采集/分析/可视化等）
+├── configs/                            # 在线/离线配置模板（yaml）
+├── data/
+│   ├── calibration/                    # 示例标定文件
+│   └── captures_master_slave/          # 示例采集数据（如存在）
+├── models/                             # 推理模型（.pt/.rknn）
+├── tests/                              # pytest 测试
+├── docs/                               # 文档
+├── SDK_Development/                    # 海康 SDK 随附文件/示例（供应商目录）
+└── 工业相机Windows SDK开发指南V4.7.0（Python）.chm
 ```
 
 ### B. 关键常数与字段

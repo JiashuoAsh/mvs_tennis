@@ -32,7 +32,7 @@
     - `mvs.pipeline.open_quad_capture()` 打开相机与组包
     - `tennis3d.pipeline.iter_mvs_image_groups()` 把 `FramePacket` 转为 OpenCV BGR 图
     - `tennis3d.detectors.create_detector()` 选择 fake/color/rknn
-    - `tennis3d.pipeline.run_localization_pipeline()`：detect → `tennis3d.localization.localize_ball()` → 输出 JSONL
+    - `tennis3d.pipeline.run_localization_pipeline()`：detect → `tennis3d.localization.localize_balls()` → 输出 JSONL
 
 - 离线定位（从 captures）：`python -m tennis3d.apps.offline_localize_from_captures`
   - 调用链：
@@ -51,21 +51,21 @@
 
 ```mermaid
 flowchart TD
-    A[tools/mvs_quad_capture.py] --> B[output_dir/metadata.jsonl]
-    A --> C[output_dir/group_*/cam*.bmp]
+  A["tools/mvs_quad_capture.py"] --> B["output_dir/metadata.jsonl"]
+  A --> C["output_dir/group_*/cam*.bmp"]
 
-    B --> D[tennis3d.pipeline.iter_capture_image_groups]
-    C --> D
+  B --> D["tennis3d.pipeline.iter_capture_image_groups"]
+  C --> D
 
-    E[open_quad_capture (online)] --> F[tennis3d.pipeline.iter_mvs_image_groups]
+  E["open_quad_capture (online)"] --> F["tennis3d.pipeline.iter_mvs_image_groups"]
 
-    D --> G[tennis3d.pipeline.run_localization_pipeline]
-    F --> G
+  D --> G["tennis3d.pipeline.run_localization_pipeline"]
+  F --> G
 
-    H[Detector: fake|color|rknn] --> G
-    I[Calibration: load_calibration] --> G
+  H["Detector: fake|color|rknn"] --> G
+  I["Calibration: load_calibration"] --> G
 
-    G --> J[offline_positions_3d.jsonl / out_jsonl]
+  G --> J["offline_positions_3d.jsonl / out_jsonl"]
 ```
 
 ## 关键输入/输出格式
@@ -118,10 +118,20 @@ $$P = K [R_{wc} | t_{wc}]$$
 
 ### 3) 3D 输出（JSONL）
 
-在线/离线定位输出为 JSON Lines，每行一个成功定位记录（至少 `require_views` 个视角）：
+在线/离线定位输出为 JSON Lines：**每个同步组输出一行记录**（即使没有球也会输出 `balls: []`），便于调试与后处理。
 
+顶层关键字段：
+
+- `balls`: list[dict]，长度为 0..N
+
+每个 `ball` 元素包含（字段均可 JSON 序列化）：
+
+- `ball_id`: 组内编号（从 0 开始）
 - `ball_3d_world`: 世界坐标系 3D 点 `[x,y,z]`
-- `used_cameras`: 实际参与三角化的相机名列表
-- `reprojection_errors`: 每相机重投影误差（像素）
-- `detections`: 每相机选中的 bbox/score/center（可选）
+- `ball_3d_camera`: `{camera_name: [x,y,z]}`（仅包含参与该球定位的视角）
+- `used_cameras`: `[camera_name, ...]`（该球实际使用的相机列表）
+- `reprojection_errors`: 每相机重投影误差（像素），包含 `uv/uv_hat/error_px`
+- `detections`: `{camera_name: {bbox, score, cls, center}}`（可选，受 `include_detection_details` 控制）
+- `quality`: 质量评分（视角数越多/误差越小越高），用于排序与冲突消解
+- `num_views`、`median_reproj_error_px`、`max_reproj_error_px`: 便于快速筛选与调参
 

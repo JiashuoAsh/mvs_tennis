@@ -210,7 +210,8 @@ $$P = K [R_{wc}|t_{wc}]$$
 
 - `--detector fake`：永远在图像中心给一个 bbox（用于没有 RKNN/没有模型时跑通链路）
 - `--detector color`：HSV 颜色阈值找球（适合绿色球/高对比场景，Windows 上可用于先跑通“检测+几何”链路）
-- `--detector rknn`：使用 `src/tennis3d/offline/detector.py` 的 `TennisDetector`（需要 RKNN 运行时支持）
+- `--detector pt`：Ultralytics YOLOv8 `.pt`（CPU 推理，适合 Windows 上验证真实模型）
+- `--detector rknn`：RKNN 模型推理（需要 RKNN 运行时支持；由 `src/tennis3d/detectors.py` 统一适配）
 
 > Windows 通常无法直接跑 RKNNLite；建议：Windows 上先用 fake 跑通采集/同步/几何链路，然后在支持 RKNN 的环境（通常是 Linux + Rockchip）切换为 rknn。
 
@@ -230,15 +231,24 @@ $$P = K [R_{wc}|t_{wc}]$$
 
 ## 输出是什么？（JSONL）
 
-在线与离线都输出 JSON Lines，每行一个“成功定位”的记录（满足 `--require-views`）。常见字段：
+在线与离线都输出 JSON Lines，**每行对应一个同步组**（不论该组是否成功定位）。
 
-- `created_at`: 处理时间
-- `used_cameras`: 实际参与三角化的相机列表
-- `ball_center_uv`: 每相机使用的像素点（当前取 bbox center）
+- 顶层字段：
+	- `created_at`: 处理时间（Unix epoch 秒）
+	- `meta...`: source 产出的组信息（在线常见 `group_index`；离线常见 `group_seq/group_by/trigger_index`）
+	- `balls`: 该同步组的 0..N 个球（跨视角几何一致才会输出）
+
+其中 `balls` 是列表，每个元素是一个 ball dict（按质量从高到低排序），常见字段：
+
+- `ball_id`: 组内编号
+- `used_cameras`: 实际参与该球三角化/验证的相机列表
 - `ball_3d_world`: 世界坐标系 3D 点 `[x,y,z]`
 - `ball_3d_camera`: 各相机坐标系下 3D 点 `{serial: [x,y,z]}`
-- `reprojection_errors`: 重投影误差列表（用于评估标定/检测质量）
-- `detections`: 本次每相机选中的 bbox/score/cls/center
+- `quality`: 质量评分（用于排序与冲突消解）
+- `num_views`: 参与视角数（等价于 `len(used_cameras)`）
+- `median_reproj_error_px` / `max_reproj_error_px`: 重投影误差统计
+- `reprojection_errors`: 按相机列出 `uv/uv_hat/error_px`
+- `detections`:（默认包含）本次每相机选中的 bbox/score/cls/center
 
 meta 字段因 source 不同而不同：
 
@@ -353,22 +363,54 @@ python tools/mvs_quad_capture.py \
 	--max-groups 20 \
 	--image-width 1920 \
 	--image-height 1080 \
+    --image-offset-x 0 \
+    --image-offset-y 0 \
 	--pixel-format BayerRG8
 
 python tools/mvs_quad_capture.py \
 	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
     --trigger-cache-enable \
 	--trigger-source Software \
-	--soft-trigger-fps 18 \
-	--exposure-auto Off --exposure-us 5000 \
-	--gain-auto Off --gain 12 \
+	--soft-trigger-fps 10 \
+	--exposure-auto Off --exposure-us 10000 \
+	--gain-auto Off --gain 15 \
+	--max-groups 20 \
+    --image-width 2448 \
+	--image-height 2048 \
+    --image-offset-x 0 \
+    --image-offset-y 0 \
+	--pixel-format BayerRG8 \
 	--save-mode sdk-bmp \
-	--max-groups 20
+    --output-dir data/captures_software_trigger
 ```
 
 ### 主从触发（master 软件触发 + slaves 硬触发）
 
-#### 推荐命令（先放宽组包超时，便于验证）
+#### 低帧率校准-master_slave 同步抓图
+
+```bash
+python tools/mvs_quad_capture.py \
+	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
+    --trigger-cache-enable \
+	--master-serial DA8199303 \
+	--master-line-source ExposureStartActive \
+	--trigger-source Line0 \
+	--trigger-activation RisingEdge \
+	--exposure-auto Off --exposure-us 10000 \
+	--gain-auto Off --gain 15 \
+	--save-mode sdk-bmp \
+	--soft-trigger-fps 5 \
+	--max-groups 500 \
+	--max-wait-seconds 10 \
+    --image-width 2448 \
+	--image-height 2048 \
+    --image-offset-x 0 \
+    --image-offset-y 0 \
+	--pixel-format BayerRG8 \
+	--output-dir data/captures_master_slave/for_calib
+```
+
+#### 常用指令
 
 ```bash
 python tools/mvs_quad_capture.py \
@@ -387,6 +429,8 @@ python tools/mvs_quad_capture.py \
 	--max-wait-seconds 10 \
 	--image-width 1920 \
 	--image-height 1080 \
+    --image-offset-x 0 \
+    --image-offset-y 0 \
 	--pixel-format BayerRG8
 
 # capture for camera calibration
@@ -406,6 +450,8 @@ python tools/mvs_quad_capture.py \
 	--max-wait-seconds 10 \
     --image-width 2448 \
 	--image-height 2048 \
+    --image-offset-x 0 \
+    --image-offset-y 0 \
 	--pixel-format BayerRG8
 ```
 
