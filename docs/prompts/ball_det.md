@@ -1,9 +1,5 @@
 ## 可直接使用的优质 Prompt（多球+误检抑制+3D世界坐标）
 
-> 说明：本仓库当前代码已完成从“单球假设”升级为“多球鲁棒定位”，核心入口为 `tennis3d.localization.localize_balls()`，输出契约为每组一行 JSONL、包含 `balls: []|[...]`。
->
-> 下面内容保留为“历史改造需求/后续迭代参考 Prompt”。如需再次演进（例如加入跨帧跟踪/更强的全局优化），可基于此继续扩展。
-
 你是一个资深的计算机视觉/多相机几何工程师。请在现有代码库 MVS_Deployment 中，将“网球3D世界坐标定位”从**单球假设**升级为**多球鲁棒定位**，解决实机中“场地多球 + 模型误检”的可靠性问题。
 
 ### 1. 项目背景与当前流程（必须理解并对齐）
@@ -14,11 +10,13 @@
   - 读取组：`tennis3d.pipeline.iter_capture_image_groups()`
   - 每组图像做检测：`tennis3d.detectors.create_detector()` 得到统一接口 `detect(img_bgr)->list[Detection]`
   - 几何定位主流程：`tennis3d.pipeline.run_localization_pipeline()`
-  - 核心几何：`tennis3d.localization.localize_balls()`
+  - 核心几何：`tennis3d.localization.localize_ball()`
 
-历史限制（已解决）：
-- 旧版 `localize_ball()` 只输出一个球，且每相机只取单个最佳检测；多球/误检场景不可靠。
-- 当前实现已替换为 `localize_balls()`，并在 pipeline/apps/config/docs/tests 全链路升级为 `balls` 输出。
+当前关键限制（你必须在代码中精确定位并改掉）：
+- `src/tennis3d/localization/localize.py::localize_ball()` 明确写了“每个相机只取 score 最大的一个检测框”，并通过 `_pick_best_detection()` 实现。
+- `src/tennis3d/pipeline/core.py::run_localization_pipeline()` 也只产出**一个** `ball_3d_world` 记录（JSONL 每行最多一个球）。
+
+这在实机完全不可靠：同一组图像里可能有多个球，且检测模型会误检。我们需要从“单输出”升级为“0..N 个球的输出”。
 
 ### 2. 改造目标（验收口径）
 在 **每个同步组**（即 pipeline 的每次 `meta, images_by_camera`）里，系统应输出：
@@ -29,7 +27,9 @@
 - 在多球情况下要避免“同一个相机的同一个检测框被多个 3D 球重复使用”（除非你给出明确的理由与实现）
 
 ### 3. 输出数据契约（必须落实到代码）
-当前 pipeline 输出为多球字段（建议结构；可在不降低可用性的前提下继续微调）：
+请将 pipeline 输出从单球字段：
+- `ball_3d_world`, `ball_center_uv`, `detections`, `used_cameras`, `reprojection_errors`
+升级为多球字段（建议结构，可在不降低可用性的前提下微调）：
 
 - `balls`: list[dict]
   - 每个元素包含：

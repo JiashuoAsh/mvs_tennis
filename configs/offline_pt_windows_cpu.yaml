@@ -1,0 +1,49 @@
+﻿# 离线 3D 定位配置（Windows/CPU，使用 Ultralytics YOLOv8 .pt）
+# 用法示例（任选其一）：
+# - uv run python -m tennis3d.apps.offline_localize_from_captures --config configs/offline_pt_windows_cpu.yaml
+# - tennis3d-offline --config examples/configs/offline_pt_windows_cpu.yaml
+
+# captures 目录：要求包含 metadata.jsonl，且其中 frames.file 指向实际图片。
+captures_dir: data/captures_master_slave/tennis_test
+
+# 标定文件：支持 .json/.yaml/.yml
+calib: data/calibration/example_triple_camera_calib.json
+
+# 可选：只使用指定相机序列号（serial）参与检测/定位。
+# - 不写或注释掉：默认使用 captures 中出现的全部相机。
+# - 注意：3D 定位至少需要 2 路视角，且 serials 数量必须 >= require_views。
+# serials:
+#   - DA8199303
+#   - DA8199402
+
+# 检测器后端：fake|color|rknn|pt
+# Windows 上通常使用 pt（不依赖 rknn 运行时）。
+detector: pt
+
+# 模型路径：detector=pt 时必填（.pt）
+model: data/models/best.pt
+
+# 置信度阈值：会传给 detector，同时也会作为 pipeline 的 min_score
+min_score: 0.25
+
+# 至少需要几路相机同时检测到球，才会做三角化输出 3D
+require_views: 2
+
+# 多球鲁棒定位参数：
+# - 每路相机最多取 topK 个候选参与跨视角匹配（防止组合爆炸）
+max_detections_per_camera: 10
+
+# - 3D 候选的最大重投影误差阈值（像素），越小越严格、误检越少
+max_reproj_error_px: 10.0
+
+# - 把 3D 点投影到某相机后，与该相机检测框中心匹配的最大距离（像素）
+max_uv_match_dist_px: 25.0
+
+# - 3D 去重阈值（米）：不同相机组合可能得到同一球的重复解
+merge_dist_m: 0.08
+
+# 最多处理多少个 group（0 表示不限）
+max_groups: 0
+
+# 输出 JSONL 路径（每行一个结果记录）
+out_jsonl: data/tools_output/offline_positions_3d.pt.jsonl

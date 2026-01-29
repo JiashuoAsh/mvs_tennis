@@ -1,0 +1,67 @@
+﻿# 在线采集 + 3D 定位配置（Windows/CPU，使用 Ultralytics YOLOv8 .pt）
+# 用法示例：
+# - uv run python -m tennis3d.apps.online_mvs_localize --config examples/configs/online_pt_windows_cpu_software_trigger.yaml
+# - tennis3d-online --config examples/configs/online_pt_windows_cpu_software_trigger.yaml
+
+# MVS SDK 动态库目录（可选）。
+# 典型路径示例：SDK_Development/Bin/win64
+# 如果你的环境已经配置好 PATH，也可以留空。
+dll_dir: SDK_Development/Bin/win64
+
+# 相机序列号列表（必填，至少 1 个；多相机建议 2~4 个）
+serials:
+  - "DA8199285"
+  - "DA8199303"
+  - "DA8199402"
+
+# 分组对齐策略：trigger_index|frame_num|sequence
+# 一般在线采集推荐 frame_num。
+group_by: frame_num
+
+# 单张图等待超时（ms）
+timeout_ms: 1000
+
+# 一个 group 等待齐的超时（ms）
+group_timeout_ms: 1000
+
+# 允许积压的 group 数量上限（防止内存无限增长）
+max_pending_groups: 256
+
+# 最多处理多少个 group（0 表示不限）
+max_groups: 0
+
+# 标定文件
+calib: data/calibration/example_triple_camera_calib.json
+
+# 检测器后端：fake|color|rknn|pt
+# Windows 上通常使用 pt。
+detector: pt
+
+# detector=pt 时必填（.pt）
+model: data/models/best.pt
+
+min_score: 0.25
+require_views: 2
+
+# 多球鲁棒定位参数：
+max_detections_per_camera: 10
+max_reproj_error_px: 8.0
+max_uv_match_dist_px: 25.0
+merge_dist_m: 0.08
+
+# 输出 JSONL（可选；留空表示只打印/不写文件）
+out_jsonl: data/tools_output/online_positions_3d.pt.jsonl
+
+# 触发参数：
+# - 纯软件触发：trigger_source=Software 且 master_serial 为空 -> 所有相机 Software，并对全部相机下发软触发
+trigger:
+  trigger_source: Software
+  master_serial: ""
+  soft_trigger_fps: 5.0
+
+  # 以下字段目前主要用于 SDK 侧设置/兼容，保持默认即可
+  master_line_out: Line1
+  master_line_source: ""
+  master_line_mode: Output
+  trigger_activation: RisingEdge
+  trigger_cache_enable: false

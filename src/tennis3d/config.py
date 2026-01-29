@@ -53,14 +53,14 @@ def _as_optional_path(x: Any) -> Path | None:
     return Path(s).expanduser()
 
 
-_DETECTOR = Literal["fake", "color", "rknn"]
+_DETECTOR = Literal["fake", "color", "rknn", "pt"]
 _GROUP_BY = Literal["trigger_index", "frame_num", "sequence"]
 
 
 def _as_detector(x: Any, default: str) -> _DETECTOR:
     s = str(x if x is not None else default).strip().lower()
-    if s not in {"fake", "color", "rknn"}:
-        raise RuntimeError(f"unknown detector: {s} (expected: fake|color|rknn)")
+    if s not in {"fake", "color", "rknn", "pt"}:
+        raise RuntimeError(f"unknown detector: {s} (expected: fake|color|rknn|pt)")
     return cast(_DETECTOR, s)
 
 
@@ -75,10 +75,16 @@ def _as_group_by(x: Any, default: str) -> _GROUP_BY:
 class OfflineAppConfig:
     captures_dir: Path
     calib: Path
+    # 可选：仅使用这些相机序列号（serial）参与检测/定位；None 表示使用 captures 中出现的全部相机。
+    serials: list[str] | None = None
     detector: _DETECTOR = "color"
     model: Path | None = None
     min_score: float = 0.25
     require_views: int = 2
+    max_detections_per_camera: int = 10
+    max_reproj_error_px: float = 8.0
+    max_uv_match_dist_px: float = 25.0
+    merge_dist_m: float = 0.08
     max_groups: int = 0
     out_jsonl: Path = Path("data/tools_output/offline_positions_3d.jsonl")
 
@@ -111,6 +117,10 @@ class OnlineAppConfig:
     model: Path | None = None
     min_score: float = 0.25
     require_views: int = 2
+    max_detections_per_camera: int = 10
+    max_reproj_error_px: float = 8.0
+    max_uv_match_dist_px: float = 25.0
+    merge_dist_m: float = 0.08
     out_jsonl: Path | None = None
 
     trigger: OnlineTriggerConfig = OnlineTriggerConfig()
@@ -121,13 +131,35 @@ def load_offline_app_config(path: Path) -> OfflineAppConfig:
 
     data = _load_mapping(Path(path))
 
+    serials_raw = data.get("serials")
+    serials: list[str] | None = None
+    if serials_raw is not None:
+        if not isinstance(serials_raw, list) or not serials_raw:
+            raise RuntimeError("offline config field 'serials' must be a non-empty list")
+        # 去重但保持顺序，避免用户写重复项导致误判数量。
+        seen: set[str] = set()
+        serials = []
+        for x in serials_raw:
+            s = str(x).strip()
+            if not s or s in seen:
+                continue
+            seen.add(s)
+            serials.append(s)
+        if not serials:
+            raise RuntimeError("offline config field 'serials' is empty after stripping")
+
     return OfflineAppConfig(
         captures_dir=_as_path(data.get("captures_dir")),
         calib=_as_path(data.get("calib")),
+        serials=serials,
         detector=_as_detector(data.get("detector"), "color"),
         model=_as_optional_path(data.get("model")),
         min_score=float(data.get("min_score", 0.25)),
         require_views=int(data.get("require_views", 2)),
+        max_detections_per_camera=int(data.get("max_detections_per_camera", 10)),
+        max_reproj_error_px=float(data.get("max_reproj_error_px", 8.0)),
+        max_uv_match_dist_px=float(data.get("max_uv_match_dist_px", 25.0)),
+        merge_dist_m=float(data.get("merge_dist_m", 0.08)),
         max_groups=int(data.get("max_groups", 0)),
         out_jsonl=_as_path(data.get("out_jsonl", "data/tools_output/offline_positions_3d.jsonl")),
     )
@@ -173,6 +205,10 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         model=_as_optional_path(data.get("model")),
         min_score=float(data.get("min_score", 0.25)),
         require_views=int(data.get("require_views", 2)),
+        max_detections_per_camera=int(data.get("max_detections_per_camera", 10)),
+        max_reproj_error_px=float(data.get("max_reproj_error_px", 8.0)),
+        max_uv_match_dist_px=float(data.get("max_uv_match_dist_px", 25.0)),
+        merge_dist_m=float(data.get("merge_dist_m", 0.08)),
         out_jsonl=_as_optional_path(data.get("out_jsonl")),
         trigger=trigger,
     )

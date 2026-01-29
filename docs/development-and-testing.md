@@ -15,20 +15,31 @@ uv pip install -e .
 
 ## 运行测试
 
-本仓库的单元测试位于 `tests/`，使用标准库 `unittest` 编写。
+本仓库的单元测试位于 `tests/`，**同时包含**：
 
-运行所有测试：
+- `unittest` 风格（`unittest.TestCase`）
+- `pytest` 风格（使用 `pytest` 的断言与夹具）
+
+为了避免漏跑用例（例如 `tests/test_detector_pt.py`），推荐统一用 `pytest` 运行全部测试。
+
+运行所有测试（推荐）：
 
 ```bash
-python -m unittest
+pytest -q
 ```
 
 你也可以只跑某个测试文件：
 
 ```bash
-python -m unittest tests.test_tennis_geometry
-python -m unittest tests.test_calibration_yaml
-python -m unittest tests.test_capture_relayout
+pytest -q tests/test_tennis_geometry.py
+pytest -q tests/test_calibration_yaml.py
+pytest -q tests/test_capture_relayout.py
+```
+
+如果你更习惯 `unittest`，也可以运行（但注意它不会执行 pytest 风格用例）：
+
+```bash
+python -m unittest
 ```
 
 测试覆盖范围：
@@ -60,7 +71,7 @@ TODO（建议落地）：统一使用 `logging`，并支持 `--log-level/--log-f
 
 推荐引入 GitHub Actions（或同类 CI）做纯软件侧的质量门禁：
 
-- 单元测试：`python -m unittest`
+- 单元测试：`pytest -q`
 - 代码风格/静态检查：
   - TODO：引入 ruff/pyright，并在 `pyproject.toml` 中配置
 

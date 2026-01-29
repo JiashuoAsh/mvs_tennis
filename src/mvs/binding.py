@@ -32,11 +32,12 @@ _DLL_DIR_HANDLES: list[Any] = []
 
 
 def _repo_root() -> Path:
-    """Best-effort locate repository root.
+    """尽力定位仓库根目录。
 
-    This project uses a src-layout (packages live under `src/`).
-    We need the *repo* root to locate bundled SDK materials under
-    `SDK_Development/...`.
+    说明：
+        - 本项目采用 src-layout（包位于 `src/` 下）。
+        - 需要找到“仓库根目录”，以定位随仓库携带的 SDK 资料（`SDK_Development/...`）。
+        - 该函数是 best-effort：优先通过标志文件/目录判断，失败则用固定层级兜底。
     """
 
     here = Path(__file__).resolve()
@@ -44,7 +45,7 @@ def _repo_root() -> Path:
         if (p / "pyproject.toml").exists() or (p / "SDK_Development").exists():
             return p
 
-    # Fallback: src/mvs/binding.py -> repo root is typically 2 levels up.
+    # 兜底：src/mvs/binding.py -> 仓库根目录通常在上两级。
     return here.parents[2]
 
 

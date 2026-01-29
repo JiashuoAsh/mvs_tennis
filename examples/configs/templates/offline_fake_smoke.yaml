@@ -1,0 +1,28 @@
+﻿# 离线 3D 定位配置模板（fake 检测器：冒烟/连通性测试）
+#
+# 适用：
+# - 你只关心程序能否跑通（解析 captures、分组、三角化接口、写 JSONL）
+# - 不关心真实检测效果
+#
+# 用法示例：
+# - uv run python -m tennis3d.apps.offline_localize_from_captures --config examples/configs/templates/offline_fake_smoke.yaml
+
+captures_dir: data/captures_master_slave/tennis_test
+calib: data/calibration/example_triple_camera_calib.json
+
+detector: fake
+model: ""
+
+# fake detector 的分数通常是固定值；这里保留字段以保持配置一致性
+min_score: 0.25
+require_views: 2
+
+# 多球鲁棒定位参数（保持与 config.py 一致；冒烟模式也建议固定写出，避免“模板缺字段”）：
+max_detections_per_camera: 10
+max_reproj_error_px: 8.0
+max_uv_match_dist_px: 25.0
+merge_dist_m: 0.08
+
+max_groups: 20
+
+out_jsonl: data/tools_output/offline_positions_3d.fake.smoke.jsonl

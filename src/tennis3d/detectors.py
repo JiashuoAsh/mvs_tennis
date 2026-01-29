@@ -104,8 +104,8 @@ def create_detector(
     """创建检测器。
 
     Args:
-        name: fake 或 rknn。
-        model_path: rknn 模型路径（name=rknn 时必填）。
+        name: fake/color/rknn/pt。
+        model_path: 模型路径（name=rknn 或 pt 时必填）。
         conf_thres: 最低置信度阈值。
 
     Returns:
@@ -124,6 +124,33 @@ def create_detector(
             raise ValueError("detector=rknn requires --model")
         from tennis3d.offline.detector import TennisDetector
 
-        return TennisDetector(model_path=Path(model_path), conf_thres=float(conf_thres))
+        # 重要：TennisDetector 内部会对输入做 letterbox 到 input_size。
+        # pipeline/core 与 triangulation 使用的是“原图像素坐标系”，这里必须把 bbox 映射回原图。
+        # 说明：不要在 TennisDetector.detect() 内做 scale back，因为 offline/pipeline.py 会单独处理。
+        from tennis3d.offline.preprocess import scale_detections_back
 
-    raise ValueError(f"unknown detector: {name} (expected: fake|color|rknn)")
+        class _RKNNScaleBackDetector:
+            def __init__(self, inner: TennisDetector):
+                self._inner = inner
+
+            def detect(self, img_bgr: np.ndarray) -> list[Detection]:
+                dets_in = self._inner.detect(img_bgr)
+                if not dets_in:
+                    return []
+                return scale_detections_back(
+                    list(dets_in),
+                    orig_shape=img_bgr.shape[:2],
+                    input_size=int(self._inner.input_size),
+                )
+
+        inner = TennisDetector(model_path=Path(model_path), conf_thres=float(conf_thres))
+        return _RKNNScaleBackDetector(inner)
+
+    if name in {"pt", "yolo", "yolov8", "ultralytics"}:
+        if model_path is None:
+            raise ValueError("detector=pt requires --model")
+        from tennis3d.offline.pt_detector import UltralyticsPTDetector
+
+        return UltralyticsPTDetector(model_path=Path(model_path), conf_thres=float(conf_thres), device="cpu")
+
+    raise ValueError(f"unknown detector: {name} (expected: fake|color|rknn|pt)")

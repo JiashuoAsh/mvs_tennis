@@ -32,18 +32,48 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Calibration path (.json/.yaml/.yml)",
     )
     p.add_argument(
+        "--serial",
+        nargs="*",
+        default=None,
+        help="Optional camera serials to use (subset). Example: --serial DA8199303 DA8199402",
+    )
+    p.add_argument(
         "--detector",
-        choices=["fake", "color", "rknn"],
+        choices=["fake", "color", "rknn", "pt"],
         default="color",
-        help="Detector backend (color works on Windows without RKNN runtime)",
+        help="Detector backend (pt uses Ultralytics YOLOv8 .pt on CPU; color works on Windows without RKNN runtime)",
     )
     p.add_argument(
         "--model",
         default="",
-        help="RKNN model path (required when --detector rknn)",
+        help="Model path (required when --detector rknn or pt)",
     )
     p.add_argument("--min-score", type=float, default=0.25, help="Ignore detections below this confidence")
     p.add_argument("--require-views", type=int, default=2, help="Minimum camera views required")
+    p.add_argument(
+        "--max-detections-per-camera",
+        type=int,
+        default=10,
+        help="TopK detections kept per camera (to limit combinations)",
+    )
+    p.add_argument(
+        "--max-reproj-error-px",
+        type=float,
+        default=8.0,
+        help="Max reprojection error in pixels for a ball candidate",
+    )
+    p.add_argument(
+        "--max-uv-match-dist-px",
+        type=float,
+        default=25.0,
+        help="Max pixel distance when matching projected 3D point to a detection center",
+    )
+    p.add_argument(
+        "--merge-dist-m",
+        type=float,
+        default=0.08,
+        help="3D merge distance in meters for deduplicating ball candidates",
+    )
     p.add_argument("--max-groups", type=int, default=0, help="Process at most N groups (0 = no limit)")
     p.add_argument(
         "--out-jsonl",
@@ -60,23 +90,52 @@ def main(argv: Optional[list[str]] = None) -> int:
         cfg = load_offline_app_config(Path(str(args.config)).resolve())
         captures_dir = Path(cfg.captures_dir).resolve()
         calib_path = Path(cfg.calib).resolve()
+        serials = list(cfg.serials) if cfg.serials is not None else None
         detector_name = str(cfg.detector)
         model_path = Path(cfg.model).resolve() if cfg.model is not None else None
         min_score = float(cfg.min_score)
         require_views = int(cfg.require_views)
+        max_detections_per_camera = int(cfg.max_detections_per_camera)
+        max_reproj_error_px = float(cfg.max_reproj_error_px)
+        max_uv_match_dist_px = float(cfg.max_uv_match_dist_px)
+        merge_dist_m = float(cfg.merge_dist_m)
         max_groups = int(cfg.max_groups)
         out_path = Path(cfg.out_jsonl).resolve()
     else:
         captures_dir = Path(args.captures_dir).resolve()
         calib_path = Path(args.calib).resolve()
+        serials = [s.strip() for s in (args.serial or []) if str(s).strip()] or None
         detector_name = str(args.detector)
         model_path = (Path(args.model).resolve() if str(args.model).strip() else None)
         min_score = float(args.min_score)
         require_views = int(args.require_views)
+        max_detections_per_camera = int(args.max_detections_per_camera)
+        max_reproj_error_px = float(args.max_reproj_error_px)
+        max_uv_match_dist_px = float(args.max_uv_match_dist_px)
+        merge_dist_m = float(args.merge_dist_m)
         max_groups = int(args.max_groups)
         out_path = Path(args.out_jsonl).resolve()
 
     calib = load_calibration(calib_path)
+
+    # 说明：离线 3D 定位至少需要 2 路视角；如果用户显式指定 serials，则在此处做一次前置校验。
+    if serials is not None:
+        if len(serials) < max(2, int(require_views)):
+            raise RuntimeError(
+                f"serials 数量不足：serials={len(serials)} require_views={int(require_views)}（至少需要 2 且 >= require_views）"
+            )
+
+        calib_serials = set(calib.cameras.keys())
+        serials_in_calib = [s for s in serials if s in calib_serials]
+        if len(serials_in_calib) < int(require_views):
+            avail = ",".join(sorted(calib_serials))
+            got = ",".join(serials)
+            raise RuntimeError(
+                "指定的 serials 与标定不匹配或数量不足："
+                f"serials=[{got}] require_views={int(require_views)} calib_cameras=[{avail}]"
+            )
+
+        serials = serials_in_calib
     detector = create_detector(
         name=detector_name,
         model_path=model_path,
@@ -85,9 +144,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     groups_done = 0
-    results_done = 0
+    records_done = 0
+    balls_done = 0
 
-    base_groups_iter = iter_capture_image_groups(captures_dir=captures_dir, max_groups=max_groups)
+    base_groups_iter = iter_capture_image_groups(captures_dir=captures_dir, max_groups=max_groups, serials=serials)
 
     def _counting_groups():
         nonlocal groups_done
@@ -102,12 +162,19 @@ def main(argv: Optional[list[str]] = None) -> int:
             detector=detector,
             min_score=float(min_score),
             require_views=int(require_views),
+            max_detections_per_camera=int(max_detections_per_camera),
+            max_reproj_error_px=float(max_reproj_error_px),
+            max_uv_match_dist_px=float(max_uv_match_dist_px),
+            merge_dist_m=float(merge_dist_m),
             include_detection_details=True,
         ):
             f_out.write(json.dumps(out_rec, ensure_ascii=False) + "\n")
-            results_done += 1
+            records_done += 1
+            balls = out_rec.get("balls") or []
+            if isinstance(balls, list):
+                balls_done += int(len(balls))
 
-    print(f"Done. groups={groups_done} results={results_done} out={out_path}")
+    print(f"Done. groups={groups_done} records={records_done} balls={balls_done} out={out_path}")
     return 0
 
 

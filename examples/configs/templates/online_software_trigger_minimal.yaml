@@ -1,0 +1,57 @@
+﻿# 在线采集 + 3D 定位配置模板（最小可用：纯软件触发）
+#
+# 用法示例：
+# - uv run python -m tennis3d.apps.online_mvs_localize --config examples/configs/templates/online_software_trigger_minimal.yaml
+
+# MVS SDK 动态库目录（可选）。如果你的环境已配置好 PATH，可留空。
+dll_dir: SDK_Development/Bin/win64
+
+# 相机序列号列表（必填，至少 1 个；多相机建议 2~4 个）
+serials:
+  - "DA8199285"
+  - "DA8199303"
+  - "DA8199402"
+
+# 分组对齐策略：trigger_index|frame_num|sequence
+# 一般在线采集推荐 frame_num。
+group_by: frame_num
+
+# 超时/缓存控制（ms/数量），用于避免一直等不到“齐组”导致的阻塞/内存增长
+timeout_ms: 1000
+group_timeout_ms: 1000
+max_pending_groups: 256
+max_groups: 0
+
+# 标定文件
+calib: data/calibration/example_triple_camera_calib.json
+
+# 检测器后端：fake|color|rknn|pt
+# 建议先用 fake 或 color 验证采集链路，再换 pt/rknn。
+detector: fake
+model: ""
+
+min_score: 0.25
+require_views: 2
+
+# 多球鲁棒定位参数：
+max_detections_per_camera: 10
+max_reproj_error_px: 8.0
+max_uv_match_dist_px: 25.0
+merge_dist_m: 0.08
+
+# 输出 JSONL（可选；留空表示只打印/不写文件）
+out_jsonl: data/tools_output/online_positions_3d.software_trigger.minimal.jsonl
+
+# 触发配置：
+# - trigger_source=Software 且 master_serial 为空：所有相机都设为 Software，并对全部相机下发软触发
+trigger:
+  trigger_source: Software
+  master_serial: ""
+  soft_trigger_fps: 5.0
+
+  # 以下字段是主从触发时会用到的“线配置”，软件触发可保持默认
+  master_line_out: Line1
+  master_line_source: ""
+  master_line_mode: Output
+  trigger_activation: RisingEdge
+  trigger_cache_enable: false
