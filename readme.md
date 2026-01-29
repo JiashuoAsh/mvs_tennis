@@ -1,34 +1,75 @@
 
-# MVS 多相机网球 3D 定位（Online/Offline Pipeline）
+# MVS_Deployment：海康 MVS 多相机采集 + 网球 3D 定位（online/offline）
 
-本仓库围绕 **海康工业相机 MVS**（SDK 封装位于 `src/mvs/`）进行多相机采集，并在采集到的图像上进行 **网球检测（bbox）**，结合 **多相机内外参**做 **多视图三角化**，输出网球的 3D 位置。
+## 仓库总结（10~20 行）
 
-你会用到两类入口：
+- 本仓库用于海康工业相机（MVS SDK）多相机同步采集，并在采集图像上完成网球检测与多视角三角化，输出网球 3D 位置。
+- `src/mvs/` 是采集封装：DLL 绑定加载、设备枚举、相机配置、取流线程、按分组键组包、保存 BMP/RAW、事件记录、带宽估算。
+- 采集主入口是 `tools/mvs_quad_capture.py`：支持 software/硬触发、master/slave、ROI、像素格式、曝光/增益，并写出 `metadata.jsonl` 供离线复盘。
+- `tools/mvs_analyze_capture_run.py` 用于分析一次采集输出：组包完整性、丢包、FPS、时间差等。
+- `src/tennis3d/` 是业务库：检测器适配（fake/color/rknn）、标定读写、三角化与重投影误差、在线/离线共用 pipeline。
+- 在线入口：`python -m tennis3d.apps.online_mvs_localize`（实时取流→检测→三角化→输出 JSONL）。
+- 离线入口：`python -m tennis3d.apps.offline_localize_from_captures`（读 captures/metadata.jsonl→检测→三角化→输出 JSONL）。
+- 样例采集数据位于 `data/captures_master_slave/tennis_test/`（包含图片与 `metadata.jsonl`）。
+- 关键依赖：Python >= 3.10、numpy、opencv-python、pyyaml；RKNN 推理依赖运行时环境（通常不在 Windows 上直接可用）。
 
-- **在线（实际应用）**：直接连相机取流 → 检测 → 多视图融合 → 输出 3D
-- **离线（offline debug）**：读取 `data/captures/<run>/metadata.jsonl` + 保存的图片 → 检测 → 多视图融合 → 输出 3D
+## 快速开始
 
-仓库内已提供一套**可直接跑通的离线样例数据**：
+### 1) 安装（推荐 uv）
 
-- 标定：`data/calibration/sample_cams.yaml`
-- 图片与 metadata：`data/captures/sample_sequence/`
+本仓库采用 src-layout（代码在 `src/` 下），推荐在虚拟环境里使用 editable 安装。
 
-同时支持两种触发同步拓扑（对齐 `tools/mvs_quad_capture.py` 的思路）：
+```bash
+uv venv
+uv sync
+uv pip install -e .
+```
 
-- **纯 Software 触发**
-- **master(Software) + slave(硬触发 LineX)**
+### 2) 设置 MVS DLL（采集相关必需）
 
-> 备注：用户描述中出现的 `msv` 这里统一为 `mvs`（本仓库目录名）。
+三种方式任选其一：
+
+- 把 DLL 目录加入系统 PATH（取决于你的 MVS 安装位置）
+- 使用环境变量：
+
+```bash
+set MVS_DLL_DIR=C:\\path\\to\\MVS\\Runtime\\Win64_x64
+```
+
+- 或命令行指定：`python tools/mvs_quad_capture.py --dll-dir ...`
+
+### 3) 离线跑通（无需相机）
+
+使用仓库内现成数据 + fake 检测器，先验证“读取 captures→几何输出”链路：
+
+```bash
+python -m tennis3d.apps.offline_localize_from_captures \
+	--captures-dir data/captures_master_slave/tennis_test \
+	--calib data/calibration/example_triple_camera_calib.json \
+	--detector fake \
+	--require-views 2 \
+	--max-groups 5 \
+	--out-jsonl data/tools_output/offline_positions_3d.jsonl
+```
+
+### 4) 采集 + 分析（连接相机）
+
+```bash
+python tools/mvs_quad_capture.py --list
+python tools/mvs_analyze_capture_run.py --output-dir data/captures_master_slave/tennis_test
+```
+
+## 文档导航
+
+- 架构与数据流：`docs/architecture-and-dataflow.md`
+- 运行模式与调试：`docs/run-modes-and-debugging.md`
+- 开发与测试：`docs/development-and-testing.md`
+- 改进建议清单：`docs/improvement-suggestions.md`
+- MVS 采集包详细说明：`src/mvs/README.md`
 
 ---
 
-## 安装（src-layout 推荐方式）
-
-本仓库采用 **src-layout**（代码在 `src/` 下），推荐在虚拟环境里使用 editable 安装，确保运行脚本/工具时 `import tennis3d` / `import mvs` 稳定：
-
-```bash
-python -m pip install -e .
-```
+以下为更细的说明与命令收集（包含大量采集经验与历史内容），需要深挖时再看。
 
 ## 你最关心的入口（Entry）
 
@@ -79,19 +120,20 @@ python -m tennis3d.apps.offline_localize_from_captures --config path/to/offline.
 
 #### 最小可运行示例（无需相机）
 
-样例数据默认已经放在 `data/captures/sample_sequence/`。直接运行：
+仓库内已带一份真实采集样例：`data/captures_master_slave/tennis_test/`（包含图片与 `metadata.jsonl`）。直接运行：
 
 ```bash
-python -m tennis3d.apps.offline_localize_from_captures --max-groups 2
+python -m tennis3d.apps.offline_localize_from_captures \
+	--captures-dir data/captures_master_slave/tennis_test \
+	--calib data/calibration/example_triple_camera_calib.json \
+	--detector fake \
+	--require-views 2 \
+	--max-groups 5
 ```
 
-输出默认在：`data/tools_output/offline_positions_3d.jsonl`。
+输出默认在：`data/tools_output/offline_positions_3d.jsonl`（也可用 `--out-jsonl` 自定义）。
 
-如果你需要重新生成样例图片（BMP），运行：
-
-```bash
-python tools/generate_sample_sequence.py
-```
+补充：`tools/generate_sample_sequence.py` 目前用于生成若干 BMP 图片，尚未生成可被离线 pipeline 直接读取的 `metadata.jsonl`（见 `docs/improvement-suggestions.md`）。
 
 ### 生成“假标定”（没有真实标定也能先跑通链路）
 
@@ -167,7 +209,7 @@ $$P = K [R_{wc}|t_{wc}]$$
 在线/离线入口默认会跑 detector 并生成 bbox。
 
 - `--detector fake`：永远在图像中心给一个 bbox（用于没有 RKNN/没有模型时跑通链路）
-- `--detector color`：HSV 颜色阈值找球（仓库内 sample_sequence 默认使用绿色球点，适合 Windows 先跑通链路）
+- `--detector color`：HSV 颜色阈值找球（适合绿色球/高对比场景，Windows 上可用于先跑通“检测+几何”链路）
 - `--detector rknn`：使用 `src/tennis3d/offline/detector.py` 的 `TennisDetector`（需要 RKNN 运行时支持）
 
 > Windows 通常无法直接跑 RKNNLite；建议：Windows 上先用 fake 跑通采集/同步/几何链路，然后在支持 RKNN 的环境（通常是 Linux + Rockchip）切换为 rknn。
@@ -254,6 +296,9 @@ python tools/mvs_quad_capture.py --list
 ```
 
 ```bash
+ python "tools\mvs_analyze_capture_run.py" --output-dir ./data/captures/offset640x640 \
+	--write-json ./data/captures/offset640x640/analysis_summary.json
+
  python "tools\mvs_analyze_capture_run.py" --output-dir ./data/captures \
 	--write-json ./data/captures/analysis_summary.json
 
@@ -262,6 +307,26 @@ python tools/mvs_quad_capture.py --list
 ```
 
 ### 纯软件触发
+
+低分辨率+offset设置demo
+
+```bash
+python tools/mvs_quad_capture.py \
+	--serial DA8199303 \
+    --trigger-cache-enable \
+	--trigger-source Software \
+	--soft-trigger-fps 90 \
+	--exposure-auto Off --exposure-us 5000 \
+	--gain-auto Off --gain 12 \
+	--save-mode sdk-bmp \
+	--max-groups 20 \
+	--image-width 1280 \
+	--image-height 1080 \
+    --image-offset-x 640 \
+    --image-offset-y 640 \
+	--pixel-format BayerRG8 \
+    --output-dir data/captures/offset640x640
+```
 
 ```bash
 python tools/mvs_quad_capture.py \
@@ -330,15 +395,18 @@ python tools/mvs_quad_capture.py \
     --trigger-cache-enable \
 	--master-serial DA8199303 \
 	--master-line-source ExposureStartActive \
-	--soft-trigger-fps 5 \
+	--soft-trigger-fps 18 \
 	--trigger-source Line0 \
 	--trigger-activation RisingEdge \
 	--exposure-auto Off --exposure-us 10000 \
 	--gain-auto Off --gain 15 \
 	--save-mode sdk-bmp \
-	--output-dir data/captures_master_slave/for_calib \
-	--max-groups 500 \
-	--max-wait-seconds 10
+	--output-dir data/captures_master_slave/tennis_test \
+	--max-groups 10 \
+	--max-wait-seconds 10 \
+    --image-width 2448 \
+	--image-height 2048 \
+	--pixel-format BayerRG8
 ```
 
 ---
