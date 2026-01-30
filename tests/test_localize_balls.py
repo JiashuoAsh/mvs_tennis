@@ -18,7 +18,7 @@ import numpy as np
 from tennis3d.geometry.calibration import CalibrationSet, CameraCalibration
 from tennis3d.geometry.triangulation import project_point
 from tennis3d.localization.localize import localize_balls
-from tennis3d.offline.models import Detection
+from tennis3d.models import Detection
 
 
 def _make_calib_three_cams() -> CalibrationSet:

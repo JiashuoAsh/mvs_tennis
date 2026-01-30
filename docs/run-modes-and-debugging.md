@@ -7,7 +7,7 @@
 ### A) 枚举设备
 
 ```bash
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 ```
 
 如果此步失败，优先处理 DLL（见下方“常见问题”）。
@@ -17,7 +17,7 @@ python tools/mvs_quad_capture.py --list
 目标：验证“打开相机→取流→组包→写 metadata”是否正常。
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial <SN0> <SN1> <SN2> <SN3> \
   --trigger-source Software \
   --soft-trigger-fps 5 \
@@ -37,7 +37,7 @@ python tools/mvs_quad_capture.py \
 - `--trigger-source Line0`：slave 的触发输入线（要与接线一致）
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial <SN_MASTER> <SN1> <SN2> <SN3> \
   --master-serial <SN_MASTER> \
   --master-line-source ExposureStartActive \
@@ -56,7 +56,7 @@ python tools/mvs_quad_capture.py \
 ### A) 运行分析脚本
 
 ```bash
-python tools/mvs_analyze_capture_run.py \
+python -m mvs.apps.analyze_capture_run \
   --output-dir data/captures_master_slave/tennis_test \
   --write-json data/captures_master_slave/tennis_test/analysis_summary.json
 ```

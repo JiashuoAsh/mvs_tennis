@@ -11,13 +11,13 @@
 
 ### 采集与诊断（mvs）
 
-- 采集主入口：`tools/mvs_quad_capture.py`
-  - 调用：`mvs.load_mvs_binding()` → `mvs.pipeline.open_quad_capture()` → 循环 `QuadCapture.get_next_group()`
+- 采集主入口：`python -m mvs.apps.quad_capture`
+  - 调用：`mvs.load_mvs_binding()` → `mvs.pipeline.open_quad_capture()` → `mvs.capture_session.run_capture_session()`
   - 输出：
     - 图片（可选）：`--save-mode sdk-bmp|raw|none`
     - 元数据：`<output_dir>/metadata.jsonl`
 
-- 采集分析：`tools/mvs_analyze_capture_run.py`
+- 采集分析：`python -m mvs.apps.analyze_capture_run`
   - 输入：`<output_dir>/metadata.jsonl`
   - 输出：报告文本（stdout）+ 可选 JSON 汇总 `--write-json`
 
@@ -39,8 +39,8 @@
     - `tennis3d.pipeline.iter_capture_image_groups()` 读取 `captures_dir/metadata.jsonl` + 图片
     - 后续与在线相同：detector → run_localization_pipeline
 
-- 三相机离线检测（时间对齐 + 推理）：`python -m tennis3d.offline.cli`
-  - 调用：`tennis3d.offline.pipeline.run_pipeline()`
+- 三相机离线检测（时间对齐 + 推理）：`python -m tennis3d.apps.offline_detect`
+  - 调用：`tennis3d.offline_detect.pipeline.run_pipeline()`
   - 输出：`data/tools_output/tennis_detections.json`（可选 CSV/可视化）
 
 - 仅几何三角化（已有 detections.json）：`tools/tennis_localize_from_detections.py`
@@ -51,7 +51,7 @@
 
 ```mermaid
 flowchart TD
-  A["tools/mvs_quad_capture.py"] --> B["output_dir/metadata.jsonl"]
+  A["python -m mvs.apps.quad_capture"] --> B["output_dir/metadata.jsonl"]
   A --> C["output_dir/group_*/cam*.bmp"]
 
   B --> D["tennis3d.pipeline.iter_capture_image_groups"]
@@ -72,7 +72,7 @@ flowchart TD
 
 ### 1) captures：`metadata.jsonl`
 
-`tools/mvs_quad_capture.py` 在 `output_dir/metadata.jsonl` 中混合写入两类记录：
+`python -m mvs.apps.quad_capture` 在 `output_dir/metadata.jsonl` 中混合写入两类记录：
 
 - 事件记录：`{"type": "camera_event", ...}`、`{"type": "soft_trigger_send", ...}`
 - 组记录：包含 `frames` 字段（`tennis3d.pipeline.iter_capture_image_groups()` 会自动跳过事件记录）

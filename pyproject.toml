@@ -20,8 +20,8 @@ dependencies = [
 [project.scripts]
 tennis3d-online = "tennis3d.apps.online_mvs_localize:main"
 tennis3d-offline = "tennis3d.apps.offline_localize_from_captures:main"
-tennis3d-fake-calib = "tennis3d.geometry.fake_calibration_cli:main"
-tennis3d-offline-detect = "tennis3d.offline.cli:main"
+tennis3d-fake-calib = "tennis3d.apps.fake_calibration:main"
+tennis3d-offline-detect = "tennis3d.apps.offline_detect:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

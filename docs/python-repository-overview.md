@@ -64,7 +64,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      应用层（CLI）                           │
-│  采集：tools/mvs_quad_capture.py                              │
+│  采集：python -m mvs.apps.quad_capture                         │
 │  在线 3D：python -m tennis3d.apps.online_mvs_localize          │
 │  离线 3D：python -m tennis3d.apps.offline_localize_from_captures│
 └────────────────────────┬────────────────────────────────────┘
@@ -539,7 +539,7 @@ uv sync
 **Step 3：查找相机序列号**
 
 ```bash
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 ```
 
 输出：
@@ -554,7 +554,7 @@ python tools/mvs_quad_capture.py --list
 使用软触发 15fps，仅采集 10 组：
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 DA8199??? \
   --trigger-source Software \
   --soft-trigger-fps 15 \
@@ -569,7 +569,7 @@ python tools/mvs_quad_capture.py \
 连接外部脉冲信号到相机的 Line0，执行：
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 DA8199??? \
   --trigger-source Line0 \
   --trigger-activation RisingEdge \
@@ -798,7 +798,7 @@ def save_frame_as_bmp(
 例：
 ```bash
 set MVS_DLL_DIR=D:\MVS\Bin\win64
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 ```
 
 ### Q：相机在列表中，但采集时没有出图

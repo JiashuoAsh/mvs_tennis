@@ -12,7 +12,7 @@
 | 交付物 | 说明 | 状态 |
 |--------|------|------|
 | **mvs 包** | 9 个模块（binding/camera/devices/grab/grouping/soft_trigger/save/pipeline + __init__） | ✅ 完成 |
-| **CLI 工具** | `tools/mvs_quad_capture.py` 改造为薄封装，调用 mvs 包 API | ✅ 完成 |
+| **CLI 工具** | `python -m mvs.apps.quad_capture` 采集入口（位于 `src/mvs/apps/quad_capture.py`） | ✅ 完成 |
 | **文档** | docs/ 下的完整项目文档 + mvs/README.md 包文档 | ✅ 完成 |
 | **示例** | examples/quad_capture_demo.py 最小可运行示例 | ✅ 完成 |
 
@@ -87,7 +87,7 @@ MVS DLL not found: MvCameraControl.dll (or dependency).
 ### 案例 1：快速验证链路（15fps 软触发）
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 DA8199??? \
   --trigger-source Software --soft-trigger-fps 15 \
   --save-mode raw --max-groups 20
@@ -98,7 +98,7 @@ python tools/mvs_quad_capture.py \
 ### 案例 2：生产采集（硬件外触发）
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 DA8199??? \
   --trigger-source Line0 --trigger-activation RisingEdge \
   --save-mode sdk-bmp --max-groups 1000
@@ -164,7 +164,7 @@ with open_quad_capture(binding, serials=[...]) as cap:
 ```
 c:\Users\woan\Desktop\MVS_Deployment\
 │
-├── mvs/                                # 核心包 ⭐
+├── src/mvs/                            # 核心包 ⭐
 │   ├── __init__.py                    # 对外 API 导出
 │   ├── binding.py                     # DLL 加载
 │   ├── devices.py                     # 设备枚举
@@ -174,10 +174,10 @@ c:\Users\woan\Desktop\MVS_Deployment\
 │   ├── soft_trigger.py                # 软触发
 │   ├── save.py                        # 保存 BMP
 │   ├── pipeline.py                    # 四机管线
+│   ├── apps/                           # CLI 入口（python -m mvs.apps.*）
+│   │   ├── quad_capture.py             # 四相机采集
+│   │   └── analyze_capture_run.py      # captures 离线分析与报告
 │   └── README.md                      # 包使用文档
-│
-├── tools/
-│   └── mvs_quad_capture.py            # CLI 工具（已改造为调用 mvs 包）
 │
 ├── examples/
 │   └── quad_capture_demo.py           # 使用示例

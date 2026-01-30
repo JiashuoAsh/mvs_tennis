@@ -5,8 +5,8 @@
 
 - 本仓库用于海康工业相机（MVS SDK）多相机同步采集，并在采集图像上完成网球检测与多视角三角化，输出网球 3D 位置。
 - `src/mvs/` 是采集封装：DLL 绑定加载、设备枚举、相机配置、取流线程、按分组键组包、保存 BMP/RAW、事件记录、带宽估算。
-- 采集主入口是 `tools/mvs_quad_capture.py`：支持 software/硬触发、master/slave、ROI、像素格式、曝光/增益，并写出 `metadata.jsonl` 供离线复盘。
-- `tools/mvs_analyze_capture_run.py` 用于分析一次采集输出：组包完整性、丢包、FPS、时间差等。
+- 采集主入口：`python -m mvs.apps.quad_capture`：支持 software/硬触发、master/slave、ROI、像素格式、曝光/增益，并写出 `metadata.jsonl` 供离线复盘。
+- 采集分析入口：`python -m mvs.apps.analyze_capture_run`：用于分析一次采集输出：组包完整性、丢包、FPS、时间差等。
 - `src/tennis3d/` 是业务库：检测器适配（fake/color/rknn）、标定读写、三角化与重投影误差、在线/离线共用 pipeline。
 - 在线入口：`python -m tennis3d.apps.online_mvs_localize`（实时取流→检测→三角化→输出 JSONL）。
 - 离线入口：`python -m tennis3d.apps.offline_localize_from_captures`（读 captures/metadata.jsonl→检测→三角化→输出 JSONL）。
@@ -36,7 +36,7 @@ uv pip install -e .
 set MVS_DLL_DIR=C:\\path\\to\\MVS\\Runtime\\Win64_x64
 ```
 
-- 或命令行指定：`python tools/mvs_quad_capture.py --dll-dir ...`
+- 或命令行指定：`python -m mvs.apps.quad_capture --dll-dir ...`
 
 ### 3) 离线跑通（无需相机）
 
@@ -55,8 +55,8 @@ python -m tennis3d.apps.offline_localize_from_captures \
 ### 4) 采集 + 分析（连接相机）
 
 ```bash
-python tools/mvs_quad_capture.py --list
-python tools/mvs_analyze_capture_run.py --output-dir data/captures_master_slave/tennis_test
+python -m mvs.apps.quad_capture --list
+python -m mvs.apps.analyze_capture_run --output-dir data/captures_master_slave/tennis_test
 ```
 
 ## 文档导航
@@ -137,10 +137,16 @@ python -m tennis3d.apps.offline_localize_from_captures \
 
 ### 生成“假标定”（没有真实标定也能先跑通链路）
 
-- 入口：`src/tennis3d/geometry/fake_calibration_cli.py`
+- 入口：`src/tennis3d/apps/fake_calibration.py`
 
 ```bash
-python -m tennis3d.geometry.fake_calibration_cli --help
+python -m tennis3d.apps.fake_calibration --help
+```
+
+也支持 console script：
+
+```bash
+tennis3d-fake-calib --help
 ```
 
 ### 仅几何：从已有 bbox JSON 做三角化（不跑检测）
@@ -217,7 +223,7 @@ $$P = K [R_{wc}|t_{wc}]$$
 
 ### 3) 离线 captures 目录（离线模式必需）
 
-离线入口读取 `data/captures/<run>/metadata.jsonl`。该文件由 `tools/mvs_quad_capture.py` 生成（默认输出到 `data/captures/`），包含两类记录：
+离线入口读取 `data/captures/<run>/metadata.jsonl`。该文件由 `python -m mvs.apps.quad_capture` 生成（默认输出到 `data/captures/`），包含两类记录：
 
 - **事件记录**（相机事件/软触发发送记录等）：会被离线 pipeline 自动跳过
 - **组包记录**：包含 `frames: [...]`，每个 frame 至少包含 `serial` 与 `file`
@@ -290,8 +296,8 @@ meta 字段因 source 不同而不同：
 
 ## 先跑通链路（推荐步骤）
 
-1) 用 `tools/mvs_quad_capture.py` 先采一段数据到 `data/captures/`（确认同步组包正常）。
-2) 没有真实标定时，用 `fake_calibration_cli` 生成一个临时标定 JSON。
+1) 用 `python -m mvs.apps.quad_capture` 先采一段数据到 `data/captures/`（确认同步组包正常）。
+2) 没有真实标定时，用 `python -m tennis3d.apps.fake_calibration`（或安装后用 `tennis3d-fake-calib`）生成一个临时标定 JSON。
 3) 用离线入口跑一遍（debug 体验最好）。
 4) 再切在线入口接入实时流。
 
@@ -302,17 +308,17 @@ meta 字段因 source 不同而不同：
 下面内容是采集脚本的常用命令与经验总结（原文保留，便于直接复制验证）。
 
 ```bash
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 ```
 
 ```bash
- python "tools\mvs_analyze_capture_run.py" --output-dir ./data/captures/offset640x640 \
+	python -m mvs.apps.analyze_capture_run --output-dir ./data/captures/offset640x640 \
 	--write-json ./data/captures/offset640x640/analysis_summary.json
 
- python "tools\mvs_analyze_capture_run.py" --output-dir ./data/captures \
+	python -m mvs.apps.analyze_capture_run --output-dir ./data/captures \
 	--write-json ./data/captures/analysis_summary.json
 
- python "tools\mvs_analyze_capture_run.py" --output-dir ./data/captures_master_slave \
+	python -m mvs.apps.analyze_capture_run --output-dir ./data/captures_master_slave \
 	--write-json ./data/captures_master_slave/analysis_summary.json
 ```
 
@@ -321,7 +327,7 @@ python tools/mvs_quad_capture.py --list
 低分辨率+offset设置demo
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
 	--serial DA8199303 \
     --trigger-cache-enable \
 	--trigger-source Software \
@@ -339,7 +345,7 @@ python tools/mvs_quad_capture.py \
 ```
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
 	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
     --trigger-cache-enable \
 	--trigger-source Software \
@@ -352,7 +358,7 @@ python tools/mvs_quad_capture.py \
 	--image-height 1080 \
 	--pixel-format BayerRG8
 
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
 	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
     --trigger-cache-enable \
 	--trigger-source Software \
@@ -367,7 +373,7 @@ python tools/mvs_quad_capture.py \
     --image-offset-y 0 \
 	--pixel-format BayerRG8
 
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
 	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
     --trigger-cache-enable \
 	--trigger-source Software \
@@ -389,7 +395,7 @@ python tools/mvs_quad_capture.py \
 #### 低帧率校准-master_slave 同步抓图
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
 	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
     --trigger-cache-enable \
 	--master-serial DA8199303 \
@@ -413,7 +419,7 @@ python tools/mvs_quad_capture.py \
 #### 常用指令
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
 	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
     --trigger-cache-enable \
 	--master-serial DA8199303 \
@@ -434,7 +440,7 @@ python tools/mvs_quad_capture.py \
 	--pixel-format BayerRG8
 
 # capture for camera calibration
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
 	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
     --trigger-cache-enable \
 	--master-serial DA8199303 \

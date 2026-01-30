@@ -36,15 +36,15 @@
 ### 3) 为 rknn detector 增加更清晰的依赖与错误提示
 
 - 问题/风险：
-  - `tennis3d.detectors.create_detector(name="rknn")` 会在运行时 import `tennis3d.offline.detector.TennisDetector`。
+  - `tennis3d.detectors.create_detector(name="rknn")` 会在运行时 import `tennis3d.offline_detect.detector.TennisDetector`。
   - 若缺少 RKNN 运行时依赖或平台不支持，错误可能不够聚焦，影响定位。
 - 建议方案：
-  - 在 `tennis3d.offline.detector` 内对 RKNN 相关 import 做一次集中检查，并抛出包含“平台限制/安装方式/替代方案(fake/color)”的错误信息。
+  - 在 `tennis3d.offline_detect.detector` 内对 RKNN 相关 import 做一次集中检查，并抛出包含“平台限制/安装方式/替代方案(fake/color)”的错误信息。
   - 在 `pyproject.toml` 增加可选依赖组（例如 `[project.optional-dependencies] rknn = [...]`）。
 - 预期收益：
   - 更快定位环境问题；减少 Windows 用户误踩。
 - 实现成本：S
-- 位置：`src/tennis3d/detectors.py`、`src/tennis3d/offline/detector.py`、`pyproject.toml`
+- 位置：`src/tennis3d/detectors.py`、`src/tennis3d/offline_detect/detector.py`、`pyproject.toml`
 
 ## P1（建议做）
 
@@ -57,7 +57,7 @@
 - 预期收益：
   - 更快定位瓶颈；日志可归档、可检索。
 - 实现成本：M
-- 位置：`tools/mvs_quad_capture.py`、`tools/mvs_analyze_capture_run.py`、`src/tennis3d/apps/*`
+- 位置：`src/mvs/apps/quad_capture.py`、`src/mvs/apps/analyze_capture_run.py`、`src/tennis3d/apps/*`
 
 ### 5) 增加一个“最小端到端 smoke test”（纯离线）
 

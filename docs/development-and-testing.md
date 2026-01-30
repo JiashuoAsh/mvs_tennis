@@ -55,7 +55,7 @@ python -m unittest
 
 建议的工作方式：
 - 采集/分析时，把 stdout/stderr 重定向到文件做留档
-- 所有质量判定以 `metadata.jsonl` 与 `mvs_analyze_capture_run.py` 的报告为准
+- 所有质量判定以 `metadata.jsonl` 与 `python -m mvs.apps.analyze_capture_run` 的报告为准
 
 TODO（建议落地）：统一使用 `logging`，并支持 `--log-level/--log-file`。
 

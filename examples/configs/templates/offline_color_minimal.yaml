@@ -7,7 +7,7 @@
 # 用法示例：
 # - uv run python -m tennis3d.apps.offline_localize_from_captures --config examples/configs/templates/offline_color_minimal.yaml
 
-# captures 目录：要求包含 metadata.jsonl（由 tools/mvs_quad_capture.py 生成）
+# captures 目录：要求包含 metadata.jsonl（由 python -m mvs.apps.quad_capture 生成）
 # 说明：这里写占位符，使用前请替换为你的实际目录。
 captures_dir: <PATH_TO_CAPTURES_DIR>
 

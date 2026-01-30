@@ -17,7 +17,7 @@ from typing import Protocol
 import cv2
 import numpy as np
 
-from tennis3d.offline.models import Detection
+from tennis3d.models import Detection
 
 
 class Detector(Protocol):
@@ -122,12 +122,12 @@ def create_detector(
     if name == "rknn":
         if model_path is None:
             raise ValueError("detector=rknn requires --model")
-        from tennis3d.offline.detector import TennisDetector
+        from tennis3d.offline_detect.detector import TennisDetector
 
         # 重要：TennisDetector 内部会对输入做 letterbox 到 input_size。
         # pipeline/core 与 triangulation 使用的是“原图像素坐标系”，这里必须把 bbox 映射回原图。
-        # 说明：不要在 TennisDetector.detect() 内做 scale back，因为 offline/pipeline.py 会单独处理。
-        from tennis3d.offline.preprocess import scale_detections_back
+        # 说明：不要在 TennisDetector.detect() 内做 scale back，因为离线检测工具链会单独处理。
+        from tennis3d.preprocess import scale_detections_back
 
         class _RKNNScaleBackDetector:
             def __init__(self, inner: TennisDetector):
@@ -149,8 +149,9 @@ def create_detector(
     if name in {"pt", "yolo", "yolov8", "ultralytics"}:
         if model_path is None:
             raise ValueError("detector=pt requires --model")
-        from tennis3d.offline.pt_detector import UltralyticsPTDetector
+        from tennis3d.offline_detect.pt_detector import UltralyticsPTDetector
 
         return UltralyticsPTDetector(model_path=Path(model_path), conf_thres=float(conf_thres), device="cpu")
 
     raise ValueError(f"unknown detector: {name} (expected: fake|color|rknn|pt)")
+

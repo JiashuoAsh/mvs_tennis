@@ -27,7 +27,12 @@ from tennis3d.geometry.triangulation import (
     reprojection_errors,
     triangulate_dlt,
 )
-from tennis3d.offline.models import Detection
+from tennis3d.models import Detection
+from tennis3d.localization._postprocess import (
+    deduplicate_by_3d_distance as _deduplicate_by_3d_distance,
+    select_non_conflicting as _select_non_conflicting,
+)
+from tennis3d.localization._quality import compute_quality as _compute_quality
 
 
 @dataclass(frozen=True)
@@ -296,65 +301,3 @@ def _all_positive_depth(*, X_w: np.ndarray, calib_by_camera: Mapping[str, Camera
         if float(X_c[2]) <= 1e-6:
             return False
     return True
-
-
-def _compute_quality(*, dets: Mapping[str, Detection], errs: Sequence[ReprojectionError]) -> float:
-    """综合质量评分。
-
-    经验规则：
-        - 视角数越多越好（强权重）
-        - 重投影误差越小越好（负权重）
-        - 检测置信度越高越好（正权重，但不应压过几何一致性）
-    """
-
-    view_cnt = float(len(dets))
-    score_sum = float(sum(float(d.score) for d in dets.values()))
-    err_list = [float(e.error_px) for e in errs]
-    med_err = float(np.median(np.asarray(err_list, dtype=np.float64)))
-    max_err = float(max(err_list))
-
-    # 权重是经验值：优先保证“多视角+低误差”，score 只做次级排序。
-    return view_cnt * 1000.0 + score_sum * 10.0 - med_err * 50.0 - max_err * 10.0
-
-
-def _deduplicate_by_3d_distance(
-    cands: Sequence[BallLocalization],
-    *,
-    merge_dist_m: float,
-) -> list[BallLocalization]:
-    """对 3D 解做去重（3D-NMS）。"""
-
-    merge_dist_m = float(merge_dist_m)
-    if merge_dist_m <= 0:
-        return list(cands)
-
-    ordered = sorted(cands, key=lambda c: float(c.quality), reverse=True)
-    kept: list[BallLocalization] = []
-
-    for c in ordered:
-        ok = True
-        for k in kept:
-            d = float(np.linalg.norm(np.asarray(c.X_w).reshape(3) - np.asarray(k.X_w).reshape(3)))
-            if d < merge_dist_m:
-                ok = False
-                break
-        if ok:
-            kept.append(c)
-    return kept
-
-
-def _select_non_conflicting(cands: Sequence[BallLocalization]) -> list[BallLocalization]:
-    """冲突消解：同一相机同一检测不能被多个 3D 球复用。"""
-
-    ordered = sorted(cands, key=lambda c: float(c.quality), reverse=True)
-    used_keys: set[tuple[str, int]] = set()
-    selected: list[BallLocalization] = []
-
-    for c in ordered:
-        keys = {(str(cam), int(idx)) for cam, idx in c.detection_indices.items()}
-        if keys & used_keys:
-            continue
-        selected.append(c)
-        used_keys |= keys
-
-    return selected

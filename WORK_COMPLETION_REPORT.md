@@ -2,7 +2,7 @@
 
 ## 🎯 本轮工作目标
 
-将分散在 `tools/mvs_quad_capture.py` 中的四相机采集逻辑**模块化成可复用的 `mvs/` 包**，并确保：
+将分散在“旧四相机采集脚本”中的采集逻辑**模块化成可复用的 `mvs/` 包**，并确保：
 
 1. ✅ 初始化流程清晰化（DLL 加载 → SDK init → 枚举 → 打开相机）
 2. ✅ 采集与处理解耦（Grabber 线程 → 分组器 → 上层业务）
@@ -31,7 +31,7 @@
 
 ### CLI 工具改造
 
-**tools/mvs_quad_capture.py**：从 ~900 行"大杂烩"脚本 → ~250 行"薄封装" CLI
+**mvs.apps.quad_capture**：从 ~900 行"大杂烩"脚本 → 清晰分层（core 库代码 + CLI 入口）
 
 - ❌ 移除重复：绑定加载、设备枚举、相机打开、取流、分组等逻辑已抽到 mvs 包
 - ✅ 保留核心：参数解析、文件 I/O、元数据记录、心跳日志
@@ -62,7 +62,7 @@
 ### 演进过程
 
 ```
-原始脚本（tools/mvs_quad_capture.py）
+原始采集脚本（已删除）
   ↓ 问题：逻辑混杂、难以复用、DLL 缺失时体验差
   ↓
 完整脚本 v1（含错误处理）
@@ -70,7 +70,7 @@
   ↓
 包化 + CLI 分离（本轮成果）✨
   ├─ mvs/ 包（9 个模块，清晰职责）
-  ├─ tools/mvs_quad_capture.py（薄封装 CLI）
+  ├─ python -m mvs.apps.quad_capture（采集 CLI 入口）
   └─ docs/（完整文档体系）
 ```
 
@@ -83,7 +83,7 @@
   │  from mvs import open_quad_capture
   │
   └─ 或用 CLI
-     tools/mvs_quad_capture.py
+      python -m mvs.apps.quad_capture
 
 mvs 包公共 API 层
   ├─ open_quad_capture()  ← 推荐入口
@@ -240,7 +240,7 @@ except Exception:
 ### 原始方式（脚本复制）
 
 ```bash
-# 需要复制整个 tools/mvs_quad_capture.py
+# 需要复制整份“旧采集脚本”
 # 修改其中逻辑适配自己的需求
 # 维护多个副本
 ```
@@ -288,7 +288,7 @@ with open_quad_capture(binding, serials=[...]) as cap:
 set MVS_DLL_DIR=C:\path\to\mvs\bin
 
 # 2. 列举相机
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 
 # 3. 查看快速参考
 more QUICK_REFERENCE.md
@@ -298,7 +298,7 @@ more QUICK_REFERENCE.md
 
 ```bash
 # 4 台相机，软触发 15fps，采集 20 组
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial SN0 SN1 SN2 SN3 \
   --trigger-source Software --soft-trigger-fps 15 \
   --save-mode raw --max-groups 20
@@ -308,7 +308,7 @@ python tools/mvs_quad_capture.py \
 
 ```bash
 # 硬件外触发，采集 1000 个同步组
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial SN0 SN1 SN2 SN3 \
   --trigger-source Line0 --trigger-activation RisingEdge \
   --save-mode sdk-bmp --max-groups 1000

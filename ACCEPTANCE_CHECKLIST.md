@@ -178,10 +178,10 @@
 ✓ mvs/README.md               (包文档，8.2 KB)
 ```
 
-### CLI 工具 (tools/)
+### CLI 入口 (apps/)
 
 ```
-✓ tools/mvs_quad_capture.py    (CLI 改造版，<250 行)
+✓ src/mvs/apps/quad_capture.py    (采集 CLI 入口，python -m mvs.apps.quad_capture)
 ```
 
 ### 示例与文档
@@ -218,7 +218,7 @@
 
 - [x] **CLI 参数解析正确**
   ```bash
-  python tools/mvs_quad_capture.py --list  # ✓ 若有 DLL 则枚举
+  python -m mvs.apps.quad_capture --list  # ✓ 若有 DLL 则枚举
   ```
 
 ### 功能集成（需实际相机）
@@ -308,10 +308,10 @@
 set MVS_DLL_DIR=C:\path\to\mvs\bin
 
 # Step 2: 验证
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 
 # Step 3: 采集
-python tools/mvs_quad_capture.py --serial SN0 SN1 SN2 SN3 [options]
+python -m mvs.apps.quad_capture --serial SN0 SN1 SN2 SN3 [options]
 ```
 
 ✓ **部署流程清晰，无额外配置**

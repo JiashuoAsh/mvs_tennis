@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
+from mvs.paths import repo_root
+
 
 class MvsDllNotFoundError(RuntimeError):
     pass
@@ -29,24 +31,6 @@ class MvsDllNotFoundError(RuntimeError):
 # Windows 下 `os.add_dll_directory()` 返回的句柄需要保活；
 # 否则对象被 GC 回收后，目录会自动从 DLL 搜索路径中移除。
 _DLL_DIR_HANDLES: list[Any] = []
-
-
-def _repo_root() -> Path:
-    """尽力定位仓库根目录。
-
-    说明：
-        - 本项目采用 src-layout（包位于 `src/` 下）。
-        - 需要找到“仓库根目录”，以定位随仓库携带的 SDK 资料（`SDK_Development/...`）。
-        - 该函数是 best-effort：优先通过标志文件/目录判断，失败则用固定层级兜底。
-    """
-
-    here = Path(__file__).resolve()
-    for p in [here.parent, *here.parents]:
-        if (p / "pyproject.toml").exists() or (p / "SDK_Development").exists():
-            return p
-
-    # 兜底：src/mvs/binding.py -> 仓库根目录通常在上两级。
-    return here.parents[2]
 
 
 def _ensure_dll_dir(dll_dir: Path) -> None:
@@ -110,7 +94,7 @@ def load_mvs_binding(*, dll_dir: Optional[str] = None) -> MvsBinding:
         MvsDllNotFoundError: 找不到 MvCameraControl.dll 或其依赖。
     """
 
-    root = _repo_root()
+    root = repo_root()
     mvimport_dir = root / "SDK_Development" / "Samples" / "Python" / "MvImport"
     if not mvimport_dir.exists():
         raise MvsDllNotFoundError(

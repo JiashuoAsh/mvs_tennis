@@ -7,7 +7,7 @@
 
 说明：
 - 本脚本不负责跑 .rknn 检测（Windows 上通常跑不了），只做几何。
-- 输入 JSON 结构默认兼容 tennis3d.offline.pipeline 的输出。
+ - 输入 JSON 结构默认兼容 tennis3d.offline_detect.pipeline 的输出。
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--detections-json",
         default=str(Path(__file__).resolve().parents[1] / "data" / "tools_output" / "tennis_detections.json"),
-        help="Detections JSON (output of tennis3d.offline.pipeline)",
+        help="Detections JSON (output of tennis3d.offline_detect.pipeline)",
     )
     p.add_argument(
         "--calib",

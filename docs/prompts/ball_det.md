@@ -5,7 +5,7 @@
 ### 1. 项目背景与当前流程（必须理解并对齐）
 本仓库的端到端流程是：
 
-- 采集与组包：mvs_quad_capture.py 输出 `<captures_dir>/metadata.jsonl` + 图像文件
+- 采集与组包：`python -m mvs.apps.quad_capture` 输出 `<captures_dir>/metadata.jsonl` + 图像文件
 - 离线从 captures 做 3D：入口 offline_localize_from_captures.py
   - 读取组：`tennis3d.pipeline.iter_capture_image_groups()`
   - 每组图像做检测：`tennis3d.detectors.create_detector()` 得到统一接口 `detect(img_bgr)->list[Detection]`

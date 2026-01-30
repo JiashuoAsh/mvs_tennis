@@ -13,7 +13,9 @@
 
 ## TL;DR：先用脚本跑起来
 
-项目推荐用 `tools/mvs_quad_capture.py` 做采集，它会把参数、触发映射与诊断数据都记录下来。
+项目推荐直接用 `python -m mvs.apps.quad_capture` 做采集，它会把参数、触发映射与诊断数据都记录下来。
+
+入口位置：`src/mvs/apps/quad_capture.py`（在已安装 editable 或设置 `PYTHONPATH=src` 的前提下可用）。
 
 ### 1) 确保能找到 `MvCameraControl.dll`
 
@@ -26,20 +28,20 @@
 **方式 B：命令行显式指定 DLL 目录**
 
 ```bash
-python tools/mvs_quad_capture.py --dll-dir "C:\\path\\to\\mvs\\bin" --list
+python -m mvs.apps.quad_capture --dll-dir "C:\\path\\to\\mvs\\bin" --list
 ```
 
 **方式 C：通过环境变量指定 DLL 目录**
 
 ```bash
 set MVS_DLL_DIR=C:\\path\\to\\mvs\\bin
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 ```
 
 ### 2) 枚举设备
 
 ```bash
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 ```
 
 ### 3) 采集（推荐先 `--save-mode none` 测上限）
@@ -47,7 +49,7 @@ python tools/mvs_quad_capture.py --list
 #### 先验证链路：纯软件触发
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 \
   --trigger-source Software \
   --soft-trigger-fps 15 \
@@ -59,7 +61,7 @@ python tools/mvs_quad_capture.py \
 #### 生产常用：硬件外触发（严格同步靠硬件保证）
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 \
   --trigger-source Line0 \
   --trigger-activation RisingEdge \
@@ -71,7 +73,7 @@ python tools/mvs_quad_capture.py \
 #### master/slave：master 软件触发 + slaves 硬触发（常见于“master 输出曝光脉冲”）
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199303 DA8199285 DA8199402 \
   --master-serial DA8199303 \
   --master-line-source ExposureStartActive \
@@ -128,7 +130,7 @@ MVS SDK -> Grabber(每台相机一个线程) -> frame_queue -> QuadCapture.get_n
 
 ### 2) `--group-by` 的选择（强烈建议读懂）
 
-`tools/mvs_quad_capture.py` 支持三种分组键：
+采集入口（`mvs.apps.quad_capture`）支持三种分组键：
 
 1. `trigger_index`：使用 SDK 帧信息 `MV_FRAME_OUT_INFO_EX.nTriggerIndex`
    - **优点**：如果你的机型/固件能正常递增，这是最强“同一次触发”证据
@@ -168,7 +170,7 @@ $$group\_key = (value - base) \& 0xFFFFFFFF$$
 
 ## 输出文件：`metadata.jsonl` 里有什么
 
-`tools/mvs_quad_capture.py` 会在输出目录写 `metadata.jsonl`，里面混合两类记录：
+采集入口（`mvs.apps.quad_capture`）会在输出目录写 `metadata.jsonl`，里面混合两类记录：
 
 1) **事件记录**（例如 `ExposureStart`）：`type=camera_event`
 
@@ -197,7 +199,7 @@ $$group\_key = (value - base) \& 0xFFFFFFFF$$
 
 ### 2) 你以为是 master/slave，实际全软件触发
 
-`mvs_quad_capture.py` 会把 master 改成 `Software` 触发，其它相机用 `--trigger-source`。
+采集入口会把 master 改成 `Software` 触发，其它相机用 `--trigger-source`。
 如果你输出目录里出现大量 `type=soft_trigger_send`，说明你当次采集确实在下发软件触发。
 
 **建议**：每次启动先看脚本打印的 `trigger_sources=serial->source`。
@@ -275,5 +277,5 @@ with open_quad_capture(
 - `dropped_groups == 0`
 - 每组帧数等于相机数
 
-5) 需要自动出报告可用：`tools/mvs_analyze_capture_run.py`
+5) 需要自动出报告可用：`python -m mvs.apps.analyze_capture_run`
 

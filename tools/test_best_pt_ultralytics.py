@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Iterator
 import cv2
 
 if TYPE_CHECKING:  # pragma: no cover
-    from tennis3d.offline.models import Detection
+    from tennis3d.models import Detection
 
 
 @dataclass(frozen=True)
@@ -184,7 +184,7 @@ def _predict_boxes(
         names = {}
 
     # 延迟 import：避免在 ultralytics 未安装时就先因为 tennis3d import 失败。
-    from tennis3d.offline.models import Detection
+    from tennis3d.models import Detection
 
     boxes_out: list[YoloBox] = []
     dets_out: list[Detection] = []
@@ -329,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
     model = _load_yolo_model(model_path)
 
     # 延迟 import：只在真正需要画框时才加载。
-    from tennis3d.offline.preprocess import draw_detections
+    from tennis3d.preprocess import draw_detections
 
     out_vis_dir = Path(args.out_vis_dir).resolve()
 

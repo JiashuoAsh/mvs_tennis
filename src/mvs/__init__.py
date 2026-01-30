@@ -27,13 +27,25 @@ from mvs.pipeline import QuadCapture, open_quad_capture
 from mvs.save import save_frame_as_bmp
 from mvs.soft_trigger import SoftwareTriggerLoop
 from mvs.bandwidth import BandwidthEstimate, estimate_camera_bandwidth, format_bandwidth_report
+from mvs.capture_session import (
+    CaptureSessionConfig,
+    CaptureSessionResult,
+    TriggerPlan,
+    build_trigger_plan,
+    normalize_roi,
+    run_capture_session,
+)
 
 __all__ = [
     "BandwidthEstimate",
+    "CaptureSessionConfig",
+    "CaptureSessionResult",
     "DeviceDesc",
     "FramePacket",
     "Grabber",
     "MvsEvent",
+    "TriggerPlan",
+    "build_trigger_plan",
     "estimate_camera_bandwidth",
     "format_bandwidth_report",
     "MvsError",
@@ -50,6 +62,8 @@ __all__ = [
     "configure_trigger",
     "enumerate_devices",
     "load_mvs_binding",
+    "normalize_roi",
     "open_quad_capture",
+    "run_capture_session",
     "save_frame_as_bmp",
 ]

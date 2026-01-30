@@ -3,7 +3,7 @@
 """把一次 captures 目录的图片从“按组”重排为“按相机”。
 
 背景：
-- `mvs_quad_capture.py` 这类采集通常把输出组织为 group_* 目录；每个 group 里包含多台相机同一次触发的帧。
+- `python -m mvs.apps.quad_capture` 这类采集通常把输出组织为 group_* 目录；每个 group 里包含多台相机同一次触发的帧。
 - 在某些标定/质检流程里，更希望把同一台相机的所有帧放在一起（便于逐相机挑帧/筛选/可视化）。
 
 本模块读取 `metadata.jsonl` 中的 group 记录（包含 frames 列表），并把每个 frame 对应的文件

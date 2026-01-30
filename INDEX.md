@@ -17,7 +17,7 @@
 **第 2 步**：验证环境（15 分钟）
 ```bash
 set MVS_DLL_DIR=C:\path\to\mvs\bin
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 ```
 
 **第 3 步**：运行示例（20 分钟）
@@ -135,8 +135,9 @@ MVS_Deployment/
 │   ├── geometry/                    ├─ 标定/投影/三角化
 │   └── localization/                ├─ 2D→3D 融合定位
 │
-├── 🛠️ tools/
-│   └── mvs_quad_capture.py          ⭐ CLI 工具（改造版，250 行）
+├── 🛠️ src/mvs/apps/                 ⭐ CLI 入口（python -m mvs.apps.*）
+│   ├── quad_capture.py              ⭐ 四相机采集
+│   └── analyze_capture_run.py       ⭐ captures 离线分析与报告
 │
 ├── 📚 docs/
 │   ├── python-repository-overview.md   ⭐ 完整文档（24 KB）
@@ -212,20 +213,20 @@ MVS_Deployment/
 
 ```bash
 # 列举相机
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 
 # 验证链路（软触发 15fps）
-python tools/mvs_quad_capture.py --serial SN0 SN1 SN2 SN3 \
+python -m mvs.apps.quad_capture --serial SN0 SN1 SN2 SN3 \
   --trigger-source Software --soft-trigger-fps 15 \
   --save-mode raw --max-groups 10
 
 # 生产采集（硬件外触发）
-python tools/mvs_quad_capture.py --serial SN0 SN1 SN2 SN3 \
+python -m mvs.apps.quad_capture --serial SN0 SN1 SN2 SN3 \
   --trigger-source Line0 --trigger-activation RisingEdge \
   --save-mode sdk-bmp --max-groups 1000
 
 # 仅获取元数据（无保存）
-python tools/mvs_quad_capture.py --serial SN0 SN1 SN2 SN3 \
+python -m mvs.apps.quad_capture --serial SN0 SN1 SN2 SN3 \
   --trigger-source Software --soft-trigger-fps 30 \
   --save-mode none --max-groups 100
 ```

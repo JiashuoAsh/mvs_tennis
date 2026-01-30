@@ -11,10 +11,10 @@ set MVS_DLL_DIR=C:\path\to\mvs\bin  # Windows
 # 示例：set MVS_DLL_DIR=C:\Program Files (x86)\Common Files\MVS\Runtime\Win64_x64
 
 # 2. 列举相机
-python tools/mvs_quad_capture.py --list
+python -m mvs.apps.quad_capture --list
 
 # 3. 采集数据
-python tools/mvs_quad_capture.py --serial SN0 SN1 SN2 SN3 [options]
+python -m mvs.apps.quad_capture --serial SN0 SN1 SN2 SN3 [options]
 ```
 
 ---
@@ -24,7 +24,7 @@ python tools/mvs_quad_capture.py --serial SN0 SN1 SN2 SN3 [options]
 ### 验证链路（15fps 软触发，仅 10 组）
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 DA8199??? \
   --trigger-source Software --soft-trigger-fps 15 \
   --save-mode raw --max-groups 10
@@ -33,7 +33,7 @@ python tools/mvs_quad_capture.py \
 ### 生产采集（硬件外触发，保存 BMP）
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 DA8199??? \
   --trigger-source Line0 --trigger-activation RisingEdge \
   --save-mode sdk-bmp --max-groups 1000
@@ -42,7 +42,7 @@ python tools/mvs_quad_capture.py \
 ### 仅获取元数据（无图片保存）
 
 ```bash
-python tools/mvs_quad_capture.py \
+python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 DA8199??? \
   --trigger-source Software --soft-trigger-fps 30 \
   --save-mode none --max-groups 100
@@ -180,8 +180,9 @@ mvs/
 ├── soft_trigger.py      ← 软触发
 └── README.md            ← 包文档
 
-tools/
-└── mvs_quad_capture.py  ← CLI ⭐
+src/mvs/apps/
+├── quad_capture.py           ← CLI ⭐（python -m mvs.apps.quad_capture）
+└── analyze_capture_run.py    ← CLI ⭐（python -m mvs.apps.analyze_capture_run）
 
 examples/
 └── quad_capture_demo.py ← 示例 ⭐
