@@ -16,10 +16,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from curve_v3.config import CurveV3Config
+from .config import CurveV3Config
 
 if TYPE_CHECKING:  # pragma: no cover
-    from curve_v3.types import BounceEvent, Candidate
+    from .types import BounceEvent, Candidate
 
 
 def _propagate_post_bounce(

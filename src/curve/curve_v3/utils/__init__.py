@@ -5,8 +5,8 @@
       数学小函数、日志工具、分段检测器等。
 """
 
-from curve_v3.utils.bounce_detector import BounceTransitionDetector
-from curve_v3.utils.math_utils import (
+from .bounce_detector import BounceTransitionDetector
+from .math_utils import (
     constrained_quadratic_fit,
     polyder_val,
     polyval,
@@ -15,7 +15,7 @@ from curve_v3.utils.math_utils import (
     weighted_quantile_1d,
     weighted_quantiles_1d,
 )
-from curve_v3.utils.predictor_logging import default_logger
+from .predictor_logging import default_logger
 
 __all__ = [
     "BounceTransitionDetector",

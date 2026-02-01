@@ -41,6 +41,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     parser = argparse.ArgumentParser(description="MVS 多相机同步采集（支持按 group_by 分组）")
     parser.add_argument(
+        "--mvimport-dir",
+        default=None,
+        help=(
+            "MVS 官方 Python 示例绑定目录（MvImport）。"
+            "包含 MvCameraControl_class.py 等文件。"
+            "可选；也可用环境变量 MVS_MVIMPORT_DIR。"
+        ),
+    )
+    parser.add_argument(
         "--dll-dir",
         default=None,
         help="包含 MvCameraControl.dll 的目录（可选）。也可用环境变量 MVS_DLL_DIR。",
@@ -279,7 +288,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     save_mode = cast(SaveMode, str(args.save_mode))
 
     try:
-        binding = load_mvs_binding(dll_dir=args.dll_dir)
+        binding = load_mvs_binding(mvimport_dir=args.mvimport_dir, dll_dir=args.dll_dir)
     except MvsDllNotFoundError as exc:
         print(str(exc))
         return 2

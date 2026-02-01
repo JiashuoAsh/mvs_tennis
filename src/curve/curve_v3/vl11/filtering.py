@@ -12,8 +12,8 @@ from __future__ import annotations
 import math
 from typing import Sequence
 
-from curve_v3.types import BallObservation
-from curve_v3.vl11.types import TrajectoryFilterConfig
+from ..types import BallObservation
+from .types import TrajectoryFilterConfig
 
 
 def _is_finite(x: float) -> bool:

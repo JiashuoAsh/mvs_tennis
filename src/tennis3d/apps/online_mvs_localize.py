@@ -23,6 +23,7 @@ from tennis3d.detectors import create_detector
 from tennis3d.geometry.calibration import load_calibration
 from tennis3d.online.triggering import build_trigger_plan
 from tennis3d.pipeline import iter_mvs_image_groups, run_localization_pipeline
+from tennis3d.trajectory import CurveStageConfig, apply_curve_stage
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -32,6 +33,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--config",
         default="",
         help="Optional online config file (.json/.yaml/.yml). If set, other CLI args are ignored.",
+    )
+    p.add_argument(
+        "--mvimport-dir",
+        default=None,
+        help=(
+            "MVS official Python sample bindings directory (MvImport). "
+            "Optional; or set env MVS_MVIMPORT_DIR"
+        ),
     )
     p.add_argument(
         "--dll-dir",
@@ -152,6 +161,24 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="",
         help="Optional output JSONL path (if empty, print only)",
     )
+
+    # 在线时间轴（方案B）：实时滑窗映射 dev_timestamp -> host 时间轴。
+    p.add_argument(
+        "--time-sync-mode",
+        choices=["frame_host_timestamp", "dev_timestamp_mapping"],
+        default="frame_host_timestamp",
+        help="time axis mode for capture_t_abs",
+    )
+    p.add_argument("--time-mapping-warmup-groups", type=int, default=20, help="warmup groups before first fit")
+    p.add_argument("--time-mapping-window-groups", type=int, default=200, help="sliding window size in groups")
+    p.add_argument(
+        "--time-mapping-update-every-groups",
+        type=int,
+        default=5,
+        help="refit mapping every N groups after warmup",
+    )
+    p.add_argument("--time-mapping-min-points", type=int, default=20, help="min pairs per camera to fit")
+    p.add_argument("--time-mapping-hard-outlier-ms", type=float, default=50.0, help="hard outlier cutoff in ms")
     return p
 
 
@@ -168,6 +195,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if str(getattr(args, "config", "") or "").strip():
         cfg = load_online_app_config(Path(str(args.config)).resolve())
         serials = list(cfg.serials)
+        mvimport_dir = str(cfg.mvimport_dir) if cfg.mvimport_dir is not None else None
         dll_dir = str(cfg.dll_dir) if cfg.dll_dir is not None else None
         calib_path = Path(cfg.calib).resolve()
         detector_name = str(cfg.detector)
@@ -193,12 +221,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         soft_trigger_fps = float(cfg.trigger.soft_trigger_fps)
         trigger_activation = str(cfg.trigger.trigger_activation)
         trigger_cache_enable = bool(cfg.trigger.trigger_cache_enable)
+        curve_cfg = cfg.curve
+
+        time_sync_mode = str(cfg.time_sync_mode)
+        time_mapping_warmup_groups = int(cfg.time_mapping_warmup_groups)
+        time_mapping_window_groups = int(cfg.time_mapping_window_groups)
+        time_mapping_update_every_groups = int(cfg.time_mapping_update_every_groups)
+        time_mapping_min_points = int(cfg.time_mapping_min_points)
+        time_mapping_hard_outlier_ms = float(cfg.time_mapping_hard_outlier_ms)
     else:
         serials = [s.strip() for s in (args.serial or []) if s.strip()]
         if not serials:
             print("Please provide --serial (one or more).")
             return 2
 
+        mvimport_dir = str(getattr(args, "mvimport_dir", None) or "").strip() or None
         dll_dir = args.dll_dir
         calib_path = Path(args.calib).resolve()
         detector_name = str(args.detector)
@@ -224,13 +261,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         soft_trigger_fps = float(args.soft_trigger_fps)
         trigger_activation = str(args.trigger_activation)
         trigger_cache_enable = bool(args.trigger_cache_enable)
+        curve_cfg = CurveStageConfig()
+
+        time_sync_mode = str(args.time_sync_mode)
+        time_mapping_warmup_groups = int(args.time_mapping_warmup_groups)
+        time_mapping_window_groups = int(args.time_mapping_window_groups)
+        time_mapping_update_every_groups = int(args.time_mapping_update_every_groups)
+        time_mapping_min_points = int(args.time_mapping_min_points)
+        time_mapping_hard_outlier_ms = float(args.time_mapping_hard_outlier_ms)
 
     if master_serial and master_serial not in serials:
         print("--master-serial must be one of the provided --serial values.")
         return 2
 
     try:
-        binding = load_mvs_binding(dll_dir=dll_dir)
+        binding = load_mvs_binding(mvimport_dir=mvimport_dir, dll_dir=dll_dir)
     except MvsDllNotFoundError as exc:
         print(str(exc))
         return 2
@@ -290,6 +335,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 binding=binding,
                 max_groups=max_groups,
                 timeout_s=0.5,
+                time_sync_mode=str(time_sync_mode),
+                time_mapping_warmup_groups=int(time_mapping_warmup_groups),
+                time_mapping_window_groups=int(time_mapping_window_groups),
+                time_mapping_update_every_groups=int(time_mapping_update_every_groups),
+                time_mapping_min_points=int(time_mapping_min_points),
+                time_mapping_hard_outlier_ms=float(time_mapping_hard_outlier_ms),
             )
 
             def _counting_groups():
@@ -298,7 +349,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     groups_done += 1
                     yield meta, images
 
-            for out_rec in run_localization_pipeline(
+            records = run_localization_pipeline(
                 groups=_counting_groups(),
                 calib=calib,
                 detector=detector,
@@ -309,7 +360,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 max_uv_match_dist_px=float(max_uv_match_dist_px),
                 merge_dist_m=float(merge_dist_m),
                 include_detection_details=True,
-            ):
+            )
+
+            # 可选：对 3D 输出做轨迹拟合增强（落点/落地时间/走廊）。
+            records = apply_curve_stage(records, curve_cfg)
+
+            for out_rec in records:
                 records_done += 1
                 balls = out_rec.get("balls") or []
                 if isinstance(balls, list):

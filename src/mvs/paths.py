@@ -18,7 +18,7 @@ def repo_root() -> Path:
     """尽力定位仓库根目录。
 
     判定策略：
-    1) 向上遍历父目录，找到包含 `pyproject.toml` 或 `SDK_Development/` 的目录；
+    1) 向上遍历父目录，找到包含 `pyproject.toml` 的目录；
     2) 找不到则使用固定层级兜底（src/mvs/paths.py -> 仓库根目录通常在上两级）。
 
     Returns:
@@ -27,7 +27,7 @@ def repo_root() -> Path:
 
     here = Path(__file__).resolve()
     for p in [here.parent, *here.parents]:
-        if (p / "pyproject.toml").exists() or (p / "SDK_Development").exists():
+        if (p / "pyproject.toml").exists():
             return p
 
     # 兜底：src/mvs/paths.py -> 仓库根目录通常在上两级。

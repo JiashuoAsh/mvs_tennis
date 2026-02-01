@@ -3,8 +3,11 @@
 # 用法示例：
 # - uv run python -m tennis3d.apps.online_mvs_localize --config examples/configs/templates/online_software_trigger_minimal.yaml
 
+# MVS Python 示例绑定目录（MvImport，可选）：
+mvimport_dir: ""
+
 # MVS SDK 动态库目录（可选）。如果你的环境已配置好 PATH，可留空。
-dll_dir: SDK_Development/Bin/win64
+dll_dir: ""
 
 # 相机序列号列表（必填，至少 1 个；多相机建议 2~4 个）
 serials:

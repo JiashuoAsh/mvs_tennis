@@ -35,6 +35,14 @@ from mvs.capture_session import (
     normalize_roi,
     run_capture_session,
 )
+from mvs.time_mapping import (
+    LinearTimeMapping,
+    OnlineDevToHostMapper,
+    collect_frame_pairs_from_metadata,
+    fit_dev_to_host_ms,
+    load_time_mappings_json,
+    save_time_mappings_json,
+)
 
 __all__ = [
     "BandwidthEstimate",
@@ -66,4 +74,10 @@ __all__ = [
     "open_quad_capture",
     "run_capture_session",
     "save_frame_as_bmp",
+    "LinearTimeMapping",
+    "collect_frame_pairs_from_metadata",
+    "fit_dev_to_host_ms",
+    "load_time_mappings_json",
+    "save_time_mappings_json",
+    "OnlineDevToHostMapper",
 ]

@@ -22,10 +22,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from curve_v3.config import CurveV3Config
-from curve_v3.low_snr.types import WindowDecisions
-from curve_v3.types import BounceEvent
-from curve_v3.utils.math_utils import (
+from ..config import CurveV3Config
+from ..low_snr.types import WindowDecisions
+from ..types import BounceEvent
+from ..utils.math_utils import (
     constrained_quadratic_fit,
     polyder_val,
     polyval,

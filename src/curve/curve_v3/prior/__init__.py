@@ -5,11 +5,11 @@
     - 目的是减少 `curve_v3/` 根目录下文件数量，让结构更好读。
 """
 
-from curve_v3.prior.candidates import build_prior_candidates
-from curve_v3.prior.models import PriorModel, PriorFeatures, RbfSamplePriorModel, UniformPriorModel, features_from_v_minus
-from curve_v3.prior.online_integration import maybe_init_online_prior, maybe_update_online_prior
-from curve_v3.prior.online_prior import OnlinePriorWeights, load_or_create_online_prior
-from curve_v3.prior.prefit import estimate_bounce_event_from_prefit
+from .candidates import build_prior_candidates
+from .models import PriorModel, PriorFeatures, RbfSamplePriorModel, UniformPriorModel, features_from_v_minus
+from .online_integration import maybe_init_online_prior, maybe_update_online_prior
+from .online_prior import OnlinePriorWeights, load_or_create_online_prior
+from .prefit import estimate_bounce_event_from_prefit
 
 __all__ = [
     "PriorFeatures",

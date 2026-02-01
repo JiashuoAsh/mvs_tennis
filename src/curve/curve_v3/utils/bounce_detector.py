@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from curve_v3.config import CurveV3Config
+from ..config import CurveV3Config
 
 
 def _estimate_vy_end(ts: np.ndarray, ys: np.ndarray) -> float:

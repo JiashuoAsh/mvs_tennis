@@ -22,11 +22,11 @@ from typing import Any
 
 import numpy as np
 
-from curve_v3.config import CurveV3Config
-from curve_v3.core import CurvePredictorV3
-from curve_v3.legacy.outputs import build_legacy_receive_points, validate_z_speed_from_prefit
-from curve_v3.posterior import prior_nominal_state
-from curve_v3.types import BallObservation
+from ..config import CurveV3Config
+from ..core import CurvePredictorV3
+from .outputs import build_legacy_receive_points, validate_z_speed_from_prefit
+from ..posterior import prior_nominal_state
+from ..types import BallObservation
 
 
 def _try_get_hit_logger() -> logging.Logger | None:

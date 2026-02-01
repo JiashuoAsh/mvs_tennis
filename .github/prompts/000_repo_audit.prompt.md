@@ -1,5 +1,5 @@
 ---
-name: 00_repo_audit
+name: 000_repo_audit
 description: "盘点仓库入口/核心模块/热点清单/分阶段重构路线（不改代码）"
 argument-hint: "（可选）focus=某个目录，如 focus=src/"
 ---

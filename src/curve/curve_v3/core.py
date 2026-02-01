@@ -23,22 +23,22 @@ from typing import Sequence
 
 import numpy as np
 
-from curve_v3.utils import BounceTransitionDetector
-from curve_v3.low_snr import LowSnrPolicyParams, analyze_window, weights_from_conf
-from curve_v3.corridor import build_corridor_by_time, corridor_on_planes_y as compute_corridor_on_planes_y
-from curve_v3.config import CurveV3Config
-from curve_v3.utils import polyval
-from curve_v3.posterior import (
+from .utils import BounceTransitionDetector
+from .low_snr import LowSnrPolicyParams, analyze_window, weights_from_conf
+from .corridor import build_corridor_by_time, corridor_on_planes_y as compute_corridor_on_planes_y
+from .config import CurveV3Config
+from .utils import polyval
+from .posterior import (
     fit_posterior_fused_map,
     inject_posterior_anchor,
     prior_nominal_state,
 )
-from curve_v3.posterior.fusion import candidate_costs as compute_candidate_costs
-from curve_v3.posterior.fusion import reweight_candidates_and_select_best
-from curve_v3.prior import PriorModel, build_prior_candidates, estimate_bounce_event_from_prefit
-from curve_v3.prior import maybe_init_online_prior, maybe_update_online_prior
-from curve_v3.utils import default_logger
-from curve_v3.types import (
+from .posterior.fusion import candidate_costs as compute_candidate_costs
+from .posterior.fusion import reweight_candidates_and_select_best
+from .prior import PriorModel, build_prior_candidates, estimate_bounce_event_from_prefit
+from .prior import maybe_init_online_prior, maybe_update_online_prior
+from .utils import default_logger
+from .types import (
     BallObservation,
     BounceEvent,
     Candidate,
@@ -274,7 +274,7 @@ class CurvePredictorV3:
         yw_fit = yw
         zw_fit = zw
 
-        # region 检测 prefit/post 切分点    
+        # region 检测 prefit/post 切分点
         if self._prefit_cut_index is None:
             cut, reason = self._bounce_detector.find_cut_index(
                 ts=t,

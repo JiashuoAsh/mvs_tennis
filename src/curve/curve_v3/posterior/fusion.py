@@ -16,11 +16,11 @@ from typing import Sequence
 
 import numpy as np
 
-from curve_v3.config import CurveV3Config
-from curve_v3.dynamics import propagate_post_bounce_state
-from curve_v3.posterior import fit_posterior_map_for_candidate
-from curve_v3.low_snr.types import WindowDecisions
-from curve_v3.types import BallObservation, BounceEvent, Candidate, PosteriorState
+from ..config import CurveV3Config
+from ..dynamics import propagate_post_bounce_state
+from . import fit_posterior_map_for_candidate
+from ..low_snr.types import WindowDecisions
+from ..types import BallObservation, BounceEvent, Candidate, PosteriorState
 
 
 def candidate_costs(

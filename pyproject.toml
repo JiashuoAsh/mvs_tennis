@@ -34,3 +34,8 @@ where = ["src"]
 dev = [
     "pytest>=9.0.2",
 ]
+
+[tool.pytest.ini_options]
+# 说明：仓库里存在 tools/test_*.py 之类的“工具脚本”。
+# 为避免与单测语义混淆、也避免 pytest 误收集，把测试发现范围固定到 tests/。
+testpaths = ["tests"]

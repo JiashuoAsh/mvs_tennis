@@ -77,7 +77,7 @@ MVS DLL not found: MvCameraControl.dll (or dependency).
 解决方法：
 1) 安装海康 MVS（Machine Vision Software），确保系统 PATH 可找到 MvCameraControl.dll；
 2) 或使用参数 dll_dir / 环境变量 MVS_DLL_DIR 指向 DLL 目录；
-3) 注意：本仓库的 SDK_Development/Bin 下通常只有示例 exe，没有 dll。
+3) 提示：MvCameraControl.dll 通常位于 MVS 安装目录的 Runtime/Bin 之类路径。
 ```
 
 ---

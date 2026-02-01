@@ -60,7 +60,7 @@ def iter_localization_from_captures(
     min_score: float = 0.25,
     require_views: int = 2,
     max_detections_per_camera: int = 10,
-    max_reproj_error_px: float = 8.0,
+    max_reproj_error_px: float = 10.0,
     max_uv_match_dist_px: float = 25.0,
     merge_dist_m: float = 0.08,
     max_groups: int = 0,

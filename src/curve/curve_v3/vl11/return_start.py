@@ -12,8 +12,8 @@
 
 from __future__ import annotations
 
-from curve_v3.types import BallObservation
-from curve_v3.vl11.types import ReturnStartConfig
+from ..types import BallObservation
+from .types import ReturnStartConfig
 
 
 def find_return_start_index(points: list[BallObservation], cfg: ReturnStartConfig) -> int | None:

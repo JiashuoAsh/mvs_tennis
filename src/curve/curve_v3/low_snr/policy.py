@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from curve_v3.low_snr.types import AxisDecision, AxisMode, WindowDecisions
+from .types import AxisDecision, AxisMode, WindowDecisions
 
 
 @dataclass(frozen=True)

@@ -13,9 +13,9 @@ from typing import Protocol
 
 import numpy as np
 
-from curve_v3.config import CurveV3Config
-from curve_v3.prior.models import PriorModel, features_from_v_minus
-from curve_v3.types import BounceEvent, Candidate
+from ..config import CurveV3Config
+from .models import PriorModel, features_from_v_minus
+from ..types import BounceEvent, Candidate
 
 
 class _OnlinePriorProtocol(Protocol):

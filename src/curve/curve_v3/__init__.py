@@ -5,10 +5,10 @@
     - Curve：兼容旧版（legacy/curve2.py）Curve 的适配器。
 """
 
-from curve_v3.config import CurveV3Config
-from curve_v3.core import CurvePredictorV3
-from curve_v3.legacy import Curve
-from curve_v3.types import (
+from .config import CurveV3Config
+from .core import CurvePredictorV3
+from .legacy import Curve
+from .types import (
     BallObservation,
     BounceEvent,
     Candidate,

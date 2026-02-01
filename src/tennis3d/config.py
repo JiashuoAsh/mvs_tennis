@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from tennis3d.trajectory.curve_stage import CurveStageConfig
+
 
 def _load_mapping(path: Path) -> dict[str, Any]:
     path = Path(path)
@@ -55,6 +57,7 @@ def _as_optional_path(x: Any) -> Path | None:
 
 _DETECTOR = Literal["fake", "color", "rknn", "pt"]
 _GROUP_BY = Literal["trigger_index", "frame_num", "sequence"]
+_TIME_SYNC_MODE = Literal["frame_host_timestamp", "dev_timestamp_mapping"]
 
 
 def _as_detector(x: Any, default: str) -> _DETECTOR:
@@ -69,6 +72,64 @@ def _as_group_by(x: Any, default: str) -> _GROUP_BY:
     if s not in {"trigger_index", "frame_num", "sequence"}:
         raise RuntimeError(f"unknown group_by: {s} (expected: trigger_index|frame_num|sequence)")
     return cast(_GROUP_BY, s)
+
+
+def _as_time_sync_mode(x: Any, default: str) -> _TIME_SYNC_MODE:
+    s = str(x if x is not None else default).strip()
+    if s not in {"frame_host_timestamp", "dev_timestamp_mapping"}:
+        raise RuntimeError(
+            f"unknown time_sync_mode: {s} (expected: frame_host_timestamp|dev_timestamp_mapping)"
+        )
+    return cast(_TIME_SYNC_MODE, s)
+
+
+def _as_curve_stage_config(x: Any) -> CurveStageConfig:
+    """解析可选的 curve stage 配置段。
+
+    说明：
+        - 该段用于把 3D 定位输出进一步做轨迹拟合（落点/落地时间/走廊）。
+        - 默认 disabled，不影响既有行为。
+    """
+
+    if x is None:
+        return CurveStageConfig()
+    if not isinstance(x, dict):
+        raise RuntimeError("config field 'curve' must be an object")
+
+    conf_from = str(x.get("conf_from", "quality")).strip().lower()
+    if conf_from not in {"quality", "constant"}:
+        raise RuntimeError("curve.conf_from must be 'quality' or 'constant'")
+
+    cfg = CurveStageConfig(
+        enabled=bool(x.get("enabled", False)),
+        compare_v2=bool(x.get("compare_v2", False)),
+        compare_v3_legacy=bool(x.get("compare_v3_legacy", False)),
+        max_tracks=int(x.get("max_tracks", 4)),
+        association_dist_m=float(x.get("association_dist_m", 0.6)),
+        max_missed_s=float(x.get("max_missed_s", 0.6)),
+        min_dt_s=float(x.get("min_dt_s", 1e-6)),
+        corridor_y_min=float(x.get("corridor_y_min", 0.6)),
+        corridor_y_max=float(x.get("corridor_y_max", 1.6)),
+        corridor_y_step=float(x.get("corridor_y_step", 0.1)),
+        conf_from=conf_from,
+        constant_conf=float(x.get("constant_conf", 1.0)),
+        is_bot_fire=int(x.get("is_bot_fire", -1)),
+    )
+
+    if cfg.max_tracks <= 0:
+        raise RuntimeError("curve.max_tracks must be > 0")
+    if cfg.association_dist_m <= 0:
+        raise RuntimeError("curve.association_dist_m must be > 0")
+    if cfg.max_missed_s < 0:
+        raise RuntimeError("curve.max_missed_s must be >= 0")
+    if cfg.min_dt_s <= 0:
+        raise RuntimeError("curve.min_dt_s must be > 0")
+    if cfg.corridor_y_step <= 0:
+        raise RuntimeError("curve.corridor_y_step must be > 0")
+    if cfg.corridor_y_max <= cfg.corridor_y_min:
+        raise RuntimeError("curve.corridor_y_max must be > curve.corridor_y_min")
+
+    return cfg
 
 
 @dataclass(frozen=True)
@@ -88,6 +149,15 @@ class OfflineAppConfig:
     max_groups: int = 0
     out_jsonl: Path = Path("data/tools_output/offline_positions_3d.jsonl")
 
+    # 可选：方案B（对齐映射）
+    # - frame_host_timestamp：沿用原逻辑，用组内 frames[*].host_timestamp 中位数作为 capture_t_abs
+    # - dev_timestamp_mapping：使用预先拟合的 dev_timestamp -> host_ms 映射，把组时间贴近曝光时刻
+    time_sync_mode: _TIME_SYNC_MODE = "frame_host_timestamp"
+    time_mapping_path: Path | None = None
+
+    # 可选：轨迹拟合后处理（落点/落地时间/走廊）。默认 disabled。
+    curve: CurveStageConfig = CurveStageConfig()
+
 
 @dataclass(frozen=True)
 class OnlineTriggerConfig:
@@ -103,6 +173,8 @@ class OnlineTriggerConfig:
 
 @dataclass(frozen=True)
 class OnlineAppConfig:
+    # MVS 官方 Python 示例绑定目录（MvImport）。可选；不填则依赖环境变量/自动探测。
+    mvimport_dir: Path | None
     dll_dir: Path | None
     serials: list[str]
 
@@ -122,6 +194,18 @@ class OnlineAppConfig:
     max_uv_match_dist_px: float = 25.0
     merge_dist_m: float = 0.08
     out_jsonl: Path | None = None
+
+    # 在线时间轴：默认仍用 frames[*].host_timestamp 中位数。
+    # 若需要更贴近曝光时刻，可启用方案B在线滑窗映射（dev_timestamp -> host_ms）。
+    time_sync_mode: _TIME_SYNC_MODE = "frame_host_timestamp"
+    time_mapping_warmup_groups: int = 20
+    time_mapping_window_groups: int = 200
+    time_mapping_update_every_groups: int = 5
+    time_mapping_min_points: int = 20
+    time_mapping_hard_outlier_ms: float = 50.0
+
+    # 可选：轨迹拟合后处理（落点/落地时间/走廊）。默认 disabled。
+    curve: CurveStageConfig = CurveStageConfig()
 
     trigger: OnlineTriggerConfig = OnlineTriggerConfig()
 
@@ -148,8 +232,17 @@ def load_offline_app_config(path: Path) -> OfflineAppConfig:
         if not serials:
             raise RuntimeError("offline config field 'serials' is empty after stripping")
 
+    curve = _as_curve_stage_config(data.get("curve"))
+
+    captures_dir = _as_path(data.get("captures_dir"))
+    time_sync_mode = _as_time_sync_mode(data.get("time_sync_mode"), "frame_host_timestamp")
+    time_mapping_path = _as_optional_path(data.get("time_mapping_path"))
+    if time_sync_mode == "dev_timestamp_mapping" and time_mapping_path is None:
+        # 约定：若启用方案B但未显式指定映射文件，则默认在 captures_dir 下寻找。
+        time_mapping_path = captures_dir / "time_mapping_dev_to_host_ms.json"
+
     return OfflineAppConfig(
-        captures_dir=_as_path(data.get("captures_dir")),
+        captures_dir=captures_dir,
         calib=_as_path(data.get("calib")),
         serials=serials,
         detector=_as_detector(data.get("detector"), "color"),
@@ -162,6 +255,9 @@ def load_offline_app_config(path: Path) -> OfflineAppConfig:
         merge_dist_m=float(data.get("merge_dist_m", 0.08)),
         max_groups=int(data.get("max_groups", 0)),
         out_jsonl=_as_path(data.get("out_jsonl", "data/tools_output/offline_positions_3d.jsonl")),
+        time_sync_mode=time_sync_mode,
+        time_mapping_path=time_mapping_path,
+        curve=curve,
     )
 
 
@@ -192,7 +288,17 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         trigger_cache_enable=bool(trig.get("trigger_cache_enable", data.get("trigger_cache_enable", False))),
     )
 
+    curve = _as_curve_stage_config(data.get("curve"))
+
+    time_sync_mode = _as_time_sync_mode(data.get("time_sync_mode"), "frame_host_timestamp")
+    time_mapping_warmup_groups = int(data.get("time_mapping_warmup_groups", 20))
+    time_mapping_window_groups = int(data.get("time_mapping_window_groups", 200))
+    time_mapping_update_every_groups = int(data.get("time_mapping_update_every_groups", 5))
+    time_mapping_min_points = int(data.get("time_mapping_min_points", 20))
+    time_mapping_hard_outlier_ms = float(data.get("time_mapping_hard_outlier_ms", 50.0))
+
     return OnlineAppConfig(
+        mvimport_dir=_as_optional_path(data.get("mvimport_dir")),
         dll_dir=_as_optional_path(data.get("dll_dir")),
         serials=serials,
         group_by=_as_group_by(data.get("group_by"), "frame_num"),
@@ -210,5 +316,12 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         max_uv_match_dist_px=float(data.get("max_uv_match_dist_px", 25.0)),
         merge_dist_m=float(data.get("merge_dist_m", 0.08)),
         out_jsonl=_as_optional_path(data.get("out_jsonl")),
+        time_sync_mode=time_sync_mode,
+        time_mapping_warmup_groups=time_mapping_warmup_groups,
+        time_mapping_window_groups=time_mapping_window_groups,
+        time_mapping_update_every_groups=time_mapping_update_every_groups,
+        time_mapping_min_points=time_mapping_min_points,
+        time_mapping_hard_outlier_ms=time_mapping_hard_outlier_ms,
         trigger=trigger,
+        curve=curve,
     )

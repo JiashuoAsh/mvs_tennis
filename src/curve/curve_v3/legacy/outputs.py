@@ -15,9 +15,9 @@ import math
 
 import numpy as np
 
-from curve_v3.config import CurveV3Config
-from curve_v3.utils import polyder_val, real_roots_of_quadratic
-from curve_v3.types import PosteriorState
+from ..config import CurveV3Config
+from ..utils import polyder_val, real_roots_of_quadratic
+from ..types import PosteriorState
 
 
 def build_legacy_receive_points(

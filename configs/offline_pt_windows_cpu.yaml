@@ -47,3 +47,31 @@ max_groups: 0
 
 # 输出 JSONL 路径（每行一个结果记录）
 out_jsonl: data/tools_output/offline_positions_3d.pt.jsonl
+
+# 可选：轨迹拟合后处理（curve v3）。启用后会在每条输出记录中增加 `curve` 字段：
+# - 落点 predicted_land_point
+# - 落地时间 predicted_land_time_abs / predicted_land_time_rel
+# - 置信走廊 corridor_on_planes_y
+#
+# 说明：
+# - 默认关闭（enabled: false），打开后会维护跨帧 track 状态，因此更适合 jsonl 连续流。
+# - compare_v2 / compare_v3_legacy 仅用于离线对比评测（会额外输出 legacy 接球点候选）。
+#
+# curve:
+#   enabled: false
+#   compare_v2: false
+#   compare_v3_legacy: false
+#
+#   # 多球关联/track 管理
+#   max_tracks: 4
+#   association_dist_m: 0.6
+#   max_missed_s: 0.6
+#
+#   # 走廊输出：在 y=[y_min,y_max] 的多个平面上输出 xz 的统计（均值/协方差 + 过平面时间分布）
+#   corridor_y_min: 0.6
+#   corridor_y_max: 1.6
+#   corridor_y_step: 0.1
+#
+#   # 点级置信度来源：quality（用 3D 定位质量）或 constant（常量权重）
+#   conf_from: quality
+#   constant_conf: 1.0

@@ -75,6 +75,118 @@ def project_point(P: np.ndarray, X_w: np.ndarray) -> tuple[float, float]:
     return (float(x[0] / x[2]), float(x[1] / x[2]))
 
 
+def projection_jacobian(P: np.ndarray, X_w: np.ndarray) -> np.ndarray:
+    """计算像素投影 (u,v) 对世界坐标 (x,y,z) 的雅可比 J，形状为 (2,3)。
+
+    说明：
+        - 采用解析形式，避免数值差分的稳定性与性能问题。
+        - 该雅可比用于把像素域观测噪声协方差传播到 3D 点协方差：
+          Σ_X ≈ (J^T W J)^{-1}。
+        - 这里假设外参/内参已被包含在 P 中，因此 J 的单位为 px/m。
+    """
+
+    P = np.asarray(P, dtype=np.float64)
+    if P.shape != (3, 4):
+        raise ValueError(f"P 形状应为 (3,4)，实际为 {P.shape}")
+
+    X_w = np.asarray(X_w, dtype=np.float64).reshape(3)
+    Xh = np.array([X_w[0], X_w[1], X_w[2], 1.0], dtype=np.float64)
+
+    p0 = P[0, :]
+    p1 = P[1, :]
+    p2 = P[2, :]
+
+    a = float(p0 @ Xh)
+    b = float(p1 @ Xh)
+    c = float(p2 @ Xh)
+    if abs(c) < 1e-12:
+        return np.full((2, 3), np.nan, dtype=np.float64)
+
+    # 对 x,y,z 的偏导数；齐次分量 w=1 的导数为 0。
+    da = p0[:3]
+    db = p1[:3]
+    dc = p2[:3]
+
+    c2 = float(c * c)
+    # u=a/c, v=b/c
+    du = (da * c - a * dc) / c2
+    dv = (db * c - b * dc) / c2
+    J = np.stack([du, dv], axis=0).astype(np.float64)
+    return J
+
+
+def estimate_triangulation_cov_world(
+    *,
+    projections: dict[str, np.ndarray],
+    X_w: np.ndarray,
+    cov_uv_by_camera: dict[str, np.ndarray],
+    min_views: int = 2,
+) -> np.ndarray | None:
+    """估计三角化 3D 点的协方差（世界坐标系，单位 m^2）。
+
+    设计目标：
+        - 输出一个“工程可用”的不确定度尺度，用于后续拟合加权/诊断。
+        - 不追求严格的最优估计（未显式进行重投影误差最小化迭代），而是用线性化近似。
+
+    近似模型：
+        把每个相机的像素观测视为：u = π(P, X) + noise，noise ~ N(0, Σ_uv)。
+        在线性化点 X_w 处，堆叠各相机的雅可比 J_i，得到：
+
+        Σ_X ≈ (Σ_i J_i^T Σ_uv_i^{-1} J_i)^{-1}
+
+    Args:
+        projections: 相机投影矩阵 P（3x4）。
+        X_w: 世界坐标 3D 点（3,）。
+        cov_uv_by_camera: 每相机像素观测协方差（2x2，单位 px^2）。
+        min_views: 最少视角数；低于该值返回 None。
+
+    Returns:
+        3x3 协方差矩阵（单位 m^2）；若不可逆/数值异常则返回 None。
+    """
+
+    keys = [k for k in cov_uv_by_camera.keys() if k in projections]
+    if len(keys) < int(min_views):
+        return None
+
+    X_w = np.asarray(X_w, dtype=np.float64).reshape(3)
+
+    JT_W_J = np.zeros((3, 3), dtype=np.float64)
+    for k in keys:
+        P = np.asarray(projections[k], dtype=np.float64)
+        J = projection_jacobian(P, X_w)
+        if not np.all(np.isfinite(J)):
+            continue
+
+        cov_uv = np.asarray(cov_uv_by_camera[k], dtype=np.float64)
+        if cov_uv.shape != (2, 2):
+            continue
+
+        # 协方差必须正定/半正定。这里仅做最基本的数值健壮性保护。
+        try:
+            W = np.linalg.inv(cov_uv)
+        except Exception:
+            continue
+        if not np.all(np.isfinite(W)):
+            continue
+
+        JT_W_J += J.T @ W @ J
+
+    if not np.all(np.isfinite(JT_W_J)):
+        return None
+
+    # 若矩阵不可逆（几何退化/视角不足/协方差异常），返回 None。
+    try:
+        cov_X = np.linalg.inv(JT_W_J)
+    except Exception:
+        return None
+    if not np.all(np.isfinite(cov_X)):
+        return None
+
+    # 数值误差可能导致非对称，强制对称化。
+    cov_X = 0.5 * (cov_X + cov_X.T)
+    return cov_X.astype(np.float64)
+
+
 def reprojection_errors(
     *,
     projections: dict[str, np.ndarray],

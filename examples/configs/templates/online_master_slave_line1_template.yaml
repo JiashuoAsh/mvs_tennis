@@ -7,10 +7,11 @@
 # 用法示例：
 # - uv run python -m tennis3d.apps.online_mvs_localize --config examples/configs/templates/online_master_slave_line1_template.yaml
 
-# dll_dir 可按需填写；如果 PATH 已包含 SDK DLL，也可留空
-# dll_dir: SDK_Development/Bin/win64
+# MVS Python 示例绑定目录（MvImport，可选）：
+mvimport_dir: ""
 
-dll_dir: SDK_Development/Bin/win64
+# MVS SDK 动态库目录（可选）：
+dll_dir: ""
 
 # 注意：serials 的顺序对功能通常不敏感，但建议固定顺序，便于对齐输出与排查问题
 serials:

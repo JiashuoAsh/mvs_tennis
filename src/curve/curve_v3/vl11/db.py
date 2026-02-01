@@ -18,16 +18,16 @@ import json
 import sqlite3
 from pathlib import Path
 
-from curve_v3.types import BallObservation
-from curve_v3.vl11.filtering import extract_best_inlier_run, group_quality_score
-from curve_v3.vl11.return_start import find_return_start_index
-from curve_v3.vl11.split import (
+from ..types import BallObservation
+from .filtering import extract_best_inlier_run, group_quality_score
+from .return_start import find_return_start_index
+from .split import (
     find_bounce_index,
     split_by_gap_threshold,
     split_points_into_shots,
     split_shot_pre_post,
 )
-from curve_v3.vl11.types import ReturnStartConfig, ShotTrajectory, TrajectoryFilterConfig
+from .types import ReturnStartConfig, ShotTrajectory, TrajectoryFilterConfig
 
 
 def _parse_abs_loc(abs_loc: object) -> tuple[float, float, float, float] | None:

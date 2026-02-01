@@ -12,8 +12,8 @@
     - 该包不依赖 `curve_v3.core`，避免耦合与循环依赖。
 """
 
-from curve_v3.low_snr.policy import LowSnrPolicyParams, analyze_window, sigma_from_conf, weights_from_conf
-from curve_v3.low_snr.types import AxisDecision, AxisMode, WindowDecisions
+from .policy import LowSnrPolicyParams, analyze_window, sigma_from_conf, weights_from_conf
+from .types import AxisDecision, AxisMode, WindowDecisions
 
 __all__ = [
     "AxisDecision",

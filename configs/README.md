@@ -48,3 +48,21 @@
 3) `max_groups: 0` 表示不限
 
 - 离线与在线模板都遵循这个约定。
+
+4) 可选 `curve` 段：输出“落点 + 落地时间 + 置信走廊”
+
+- 该段对应 `src/tennis3d/trajectory/curve_stage.py`，默认关闭。
+- 开启方式：在 config 里增加（或取消注释）
+
+```yaml
+curve:
+  enabled: true
+```
+
+- 开启后，每条输出记录会新增 `curve` 字段：
+  - `curve.track_updates[*].v3.predicted_land_point`：落点（世界系）
+  - `curve.track_updates[*].v3.predicted_land_time_abs`：落地绝对时间（秒）
+  - `curve.track_updates[*].v3.corridor_on_planes_y`：按多条 y 平面的走廊统计（均值/协方差 + 过平面时间分布）
+
+验证标准（最小）：
+- 运行 offline/online 后，输出 jsonl 中能看到 `"curve": { ... }` 字段；且 `curve.t_source` 为 `capture_t_abs`（优先）或 `created_at`（回退）。

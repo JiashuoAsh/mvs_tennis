@@ -11,8 +11,8 @@ from __future__ import annotations
 import logging
 from typing import Sequence
 
-from curve_v3.config import CurveV3Config
-from curve_v3.types import Candidate
+from ..config import CurveV3Config
+from ..types import Candidate
 
 
 def maybe_init_online_prior(*, cfg: CurveV3Config, logger: logging.Logger):
@@ -30,7 +30,7 @@ def maybe_init_online_prior(*, cfg: CurveV3Config, logger: logging.Logger):
         return None
 
     try:
-        from curve_v3.prior.online_prior import load_or_create_online_prior
+        from .online_prior import load_or_create_online_prior
 
         e_bins = [float(x) for x in cfg.e_bins]
         kt_bins = [float(x) for x in cfg.kt_bins]

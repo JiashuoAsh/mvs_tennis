@@ -24,7 +24,7 @@ from typing import Sequence
 
 import numpy as np
 
-from curve_v3.types import Candidate
+from ..types import Candidate
 
 
 def _as_float_list(xs: Sequence[float]) -> list[float]:

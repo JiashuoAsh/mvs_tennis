@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional
 
+from mvs.metadata_io import iter_metadata_records
+
 
 @dataclass(frozen=True, slots=True)
 class RelayoutStats:
@@ -41,25 +43,11 @@ class RelayoutStats:
 def _iter_group_records(meta_path: Path) -> Iterator[Dict[str, Any]]:
     """从 metadata.jsonl 迭代出包含 frames 的 group 记录。"""
 
-    with meta_path.open("r", encoding="utf-8") as f_in:
-        for line in f_in:
-            line = line.strip()
-            if not line:
-                continue
-
-            try:
-                rec = json.loads(line)
-            except Exception:
-                continue
-
-            if not isinstance(rec, dict):
-                continue
-
-            frames = rec.get("frames")
-            if not isinstance(frames, list) or not frames:
-                continue
-
-            yield rec
+    for rec in iter_metadata_records(meta_path):
+        frames = rec.get("frames")
+        if not isinstance(frames, list) or not frames:
+            continue
+        yield rec
 
 
 def _resolve_frame_file(*, captures_dir: Path, file_value: Any) -> Optional[Path]:

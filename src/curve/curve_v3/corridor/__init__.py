@@ -17,10 +17,10 @@ from typing import Sequence
 
 import numpy as np
 
-from curve_v3.config import CurveV3Config
-from curve_v3.dynamics import propagate_post_bounce_state_grid
-from curve_v3.types import BounceEvent, Candidate, CorridorByTime, CorridorComponent, CorridorOnPlane
-from curve_v3.utils.math_utils import real_roots_of_quadratic, weighted_quantiles_1d, weighted_quantile_1d
+from ..config import CurveV3Config
+from ..dynamics import propagate_post_bounce_state_grid
+from ..types import BounceEvent, Candidate, CorridorByTime, CorridorComponent, CorridorOnPlane
+from ..utils.math_utils import real_roots_of_quadratic, weighted_quantiles_1d, weighted_quantile_1d
 
 
 def _split_components_k2(

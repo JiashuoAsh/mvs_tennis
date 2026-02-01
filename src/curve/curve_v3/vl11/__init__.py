@@ -11,15 +11,15 @@
     这些模块主要用于离线评测/数据准备，不是 `docs/curve.md` 的核心在线算法路径。
 """
 
-from curve_v3.vl11.db import extract_db_shots, load_abs_loc_points
-from curve_v3.vl11.return_start import find_return_start_index
-from curve_v3.vl11.split import (
+from .db import extract_db_shots, load_abs_loc_points
+from .return_start import find_return_start_index
+from .split import (
     find_bounce_index,
     split_by_gap_threshold,
     split_points_into_shots,
     split_shot_pre_post,
 )
-from curve_v3.vl11.types import ReturnStartConfig, ShotTrajectory, TrajectoryFilterConfig
+from .types import ReturnStartConfig, ShotTrajectory, TrajectoryFilterConfig
 
 __all__ = [
     "ReturnStartConfig",

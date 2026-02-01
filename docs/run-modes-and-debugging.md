@@ -102,6 +102,32 @@ python -m tennis3d.apps.online_mvs_localize \
   --require-views 2
 ```
 
+### C) 可选：轨迹拟合（落点 + 落地时间 + 置信走廊）
+
+前置条件：
+- 你已经能稳定输出 3D（`balls[*].ball_3d_world`）
+- 你的输入 meta 能提供 `capture_t_abs`（本仓库的 online/offline source 已默认注入；见 `src/tennis3d/pipeline/sources.py`）
+
+启用方式：推荐通过 config 文件开启。在 config 中增加：
+
+```yaml
+curve:
+  enabled: true
+```
+
+然后使用 `--config` 运行（示例）：
+
+```bash
+python -m tennis3d.apps.offline_localize_from_captures --config configs/offline_pt_windows_cpu.yaml
+```
+
+预期输出/验证标准（最小）：
+- 输出 jsonl 中每条记录新增 `curve` 字段
+- `curve.track_updates[*].v3` 下包含：
+  - `predicted_land_point`（落点）
+  - `predicted_land_time_abs` / `predicted_land_time_rel`（落地时间）
+  - `corridor_on_planes_y`（走廊统计；在模型达到可预测状态后逐步变为非空）
+
 ## 常见问题
 
 ### 1) 找不到 MvCameraControl.dll

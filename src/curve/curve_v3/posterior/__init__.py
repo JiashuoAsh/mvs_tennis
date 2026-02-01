@@ -14,10 +14,10 @@ from typing import Literal, Sequence
 
 import numpy as np
 
-from curve_v3.config import CurveV3Config
-from curve_v3.low_snr import weights_from_conf
-from curve_v3.low_snr.types import WindowDecisions
-from curve_v3.types import BallObservation, BounceEvent, Candidate, PosteriorState
+from ..config import CurveV3Config
+from ..low_snr import weights_from_conf
+from ..low_snr.types import WindowDecisions
+from ..types import BallObservation, BounceEvent, Candidate, PosteriorState
 
 
 def _safe_solve(A: np.ndarray, b: np.ndarray) -> np.ndarray:

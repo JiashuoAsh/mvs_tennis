@@ -415,6 +415,29 @@ python -m mvs.apps.quad_capture \
 	--pixel-format BayerRG8 \
 	--output-dir data/captures_master_slave/for_calib
 ```
+#### offline网球抓取
+
+```bash
+python -m mvs.apps.quad_capture \
+	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
+    --trigger-cache-enable \
+	--master-serial DA8199303 \
+	--master-line-source ExposureStartActive \
+	--trigger-source Line0 \
+	--trigger-activation RisingEdge \
+	--exposure-auto Off --exposure-us 10000 \
+	--gain-auto Off --gain 15 \
+	--save-mode sdk-bmp \
+	--soft-trigger-fps 18 \
+	--max-groups 20 \
+	--max-wait-seconds 10 \
+    --image-width 2448 \
+	--image-height 2048 \
+    --image-offset-x 0 \
+    --image-offset-y 0 \
+	--pixel-format BayerRG8 \
+	--output-dir data/captures_master_slave/tennis_offline
+```
 
 #### 常用指令
 
@@ -439,26 +462,7 @@ python -m mvs.apps.quad_capture \
     --image-offset-y 0 \
 	--pixel-format BayerRG8
 
-# capture for camera calibration
-python -m mvs.apps.quad_capture \
-	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
-    --trigger-cache-enable \
-	--master-serial DA8199303 \
-	--master-line-source ExposureStartActive \
-	--soft-trigger-fps 18 \
-	--trigger-source Line0 \
-	--trigger-activation RisingEdge \
-	--exposure-auto Off --exposure-us 10000 \
-	--gain-auto Off --gain 15 \
-	--save-mode sdk-bmp \
-	--output-dir data/captures_master_slave/tennis_test \
-	--max-groups 10 \
-	--max-wait-seconds 10 \
-    --image-width 2448 \
-	--image-height 2048 \
-    --image-offset-x 0 \
-    --image-offset-y 0 \
-	--pixel-format BayerRG8
+
 ```
 
 ---

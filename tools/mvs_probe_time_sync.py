@@ -369,6 +369,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     parser = argparse.ArgumentParser(description="探测相机是否支持时间同步（PTP/IEEE1588）")
     parser.add_argument(
+        "--mvimport-dir",
+        default=None,
+        help=(
+            "MVS 官方 Python 示例绑定目录（MvImport）。"
+            "可选；也可用环境变量 MVS_MVIMPORT_DIR。"
+        ),
+    )
+    parser.add_argument(
         "--dll-dir",
         default=None,
         help="包含 MvCameraControl.dll 的目录（可选）。也可用环境变量 MVS_DLL_DIR。",
@@ -431,7 +439,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
 
     try:
-        binding = load_mvs_binding(dll_dir=args.dll_dir)
+        binding = load_mvs_binding(mvimport_dir=args.mvimport_dir, dll_dir=args.dll_dir)
     except MvsDllNotFoundError as exc:
         print(str(exc))
         return 2

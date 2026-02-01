@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from curve_v3.types import BallObservation
+from ..types import BallObservation
 
 
 def split_by_gap_threshold(points: Sequence[BallObservation], *, gap_s: float) -> list[list[BallObservation]]:

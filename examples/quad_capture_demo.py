@@ -4,6 +4,7 @@
 
 前置条件：
 - 海康 MVS SDK 已安装，或 MvCameraControl.dll 已通过 MVS_DLL_DIR 指定
+- MVS 官方 Python 示例绑定目录（MvImport）可被找到（建议设置 MVS_MVIMPORT_DIR）
 - 4 台 GigE 相机已连接网络并配置好 IP
 """
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from curve_v3.types import BallObservation
+from ..types import BallObservation
 
 
 @dataclass(frozen=True)

@@ -1,10 +1,15 @@
 ﻿# 在线采集 + 3D 定位配置（主从触发示例：master=Software，slaves=Line1）
 # 适用：你已经在硬件上把 master 的 LineOut 接到了 slaves 的 LineIn。
 
-# dll_dir 可按需填写；如果 PATH 已包含 SDK DLL，也可留空
-# dll_dir: SDK_Development/Bin/win64
+# MVS Python 示例绑定目录（MvImport，可选）：
+# - 推荐设置环境变量：MVS_MVIMPORT_DIR=<.../MvImport>
+# - 或在此处填写目录路径（包含 MvCameraControl_class.py 等文件）
+mvimport_dir: ""
 
-dll_dir: SDK_Development/Bin/win64
+# MVS SDK 动态库目录（可选）：
+# - 推荐设置环境变量：MVS_DLL_DIR=<...>
+# - 或在此处填写目录路径（包含 MvCameraControl.dll）
+dll_dir: ""
 
 serials:
   - "DA8199285"  # 示例：master

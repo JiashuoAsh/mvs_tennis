@@ -13,9 +13,9 @@ from typing import Sequence
 
 import numpy as np
 
-from curve_v3.prior.models import PriorFeatures, features_from_v_minus
-from curve_v3.types import BallObservation
-from curve_v3.vl11.types import ShotTrajectory
+from .models import PriorFeatures, features_from_v_minus
+from ..types import BallObservation
+from ..vl11.types import ShotTrajectory
 
 
 @dataclass(frozen=True)

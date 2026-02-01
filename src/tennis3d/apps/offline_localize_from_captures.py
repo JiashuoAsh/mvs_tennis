@@ -11,6 +11,7 @@ from tennis3d.detectors import create_detector
 from tennis3d.config import load_offline_app_config
 from tennis3d.geometry.calibration import load_calibration
 from tennis3d.pipeline import iter_capture_image_groups, run_localization_pipeline
+from tennis3d.trajectory import CurveStageConfig, apply_curve_stage
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -101,6 +102,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         merge_dist_m = float(cfg.merge_dist_m)
         max_groups = int(cfg.max_groups)
         out_path = Path(cfg.out_jsonl).resolve()
+        curve_cfg = cfg.curve
+        time_sync_mode = str(cfg.time_sync_mode)
+        time_mapping_path = Path(cfg.time_mapping_path).resolve() if cfg.time_mapping_path is not None else None
     else:
         captures_dir = Path(args.captures_dir).resolve()
         calib_path = Path(args.calib).resolve()
@@ -115,6 +119,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         merge_dist_m = float(args.merge_dist_m)
         max_groups = int(args.max_groups)
         out_path = Path(args.out_jsonl).resolve()
+        curve_cfg = CurveStageConfig()
+        time_sync_mode = "frame_host_timestamp"
+        time_mapping_path = None
 
     calib = load_calibration(calib_path)
 
@@ -147,7 +154,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     records_done = 0
     balls_done = 0
 
-    base_groups_iter = iter_capture_image_groups(captures_dir=captures_dir, max_groups=max_groups, serials=serials)
+    base_groups_iter = iter_capture_image_groups(
+        captures_dir=captures_dir,
+        max_groups=max_groups,
+        serials=serials,
+        time_sync_mode=str(time_sync_mode),
+        time_mapping_path=time_mapping_path,
+    )
 
     def _counting_groups():
         nonlocal groups_done
@@ -156,7 +169,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             yield meta, images
 
     with out_path.open("w", encoding="utf-8") as f_out:
-        for out_rec in run_localization_pipeline(
+        records = run_localization_pipeline(
             groups=_counting_groups(),
             calib=calib,
             detector=detector,
@@ -167,7 +180,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             max_uv_match_dist_px=float(max_uv_match_dist_px),
             merge_dist_m=float(merge_dist_m),
             include_detection_details=True,
-        ):
+        )
+
+        # 可选：对 3D 输出做轨迹拟合增强（落点/落地时间/走廊）。
+        records = apply_curve_stage(records, curve_cfg)
+
+        for out_rec in records:
             f_out.write(json.dumps(out_rec, ensure_ascii=False) + "\n")
             records_done += 1
             balls = out_rec.get("balls") or []

@@ -21,8 +21,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-from mvs.paths import repo_root
-
 
 class MvsDllNotFoundError(RuntimeError):
     pass
@@ -60,6 +58,60 @@ def _ensure_mvimport_on_syspath(mvimport_dir: Path) -> None:
         sys.path.insert(0, str(mvimport_dir))
 
 
+def _resolve_mvimport_dir(*, mvimport_dir: Optional[str]) -> Path:
+    """解析 MvImport 目录位置。
+
+    破坏式变更说明：
+        - 不再依赖仓库内的 SDK_Development 目录结构。
+        - 默认通过以下方式定位（按优先级）：
+          1) 参数 mvimport_dir
+          2) 环境变量 MVS_MVIMPORT_DIR
+          3) 在常见 MVS 安装路径下做 best-effort 探测
+    """
+
+    candidates: list[Path] = []
+
+    if mvimport_dir is not None and str(mvimport_dir).strip():
+        candidates.append(Path(str(mvimport_dir)).expanduser())
+
+    env_dir = os.environ.get("MVS_MVIMPORT_DIR")
+    if env_dir and str(env_dir).strip():
+        candidates.append(Path(str(env_dir)).expanduser())
+
+    # best-effort：根据仓库内 examples/scratch/mvs_sdk_init.py 给出的安装路径形态
+    # （不同 SDK 版本目录名可能存在 Samples/Sample、Python/python 的差异）。
+    pf86 = os.environ.get("ProgramFiles(x86)")
+    if pf86 and str(pf86).strip():
+        base = Path(pf86) / "MVS" / "Development"
+        candidates.extend(
+            [
+                base / "Sample" / "python" / "MvImport",
+                base / "Samples" / "Python" / "MvImport",
+            ]
+        )
+
+    for c in candidates:
+        try:
+            p = c.resolve()
+        except Exception:
+            p = c
+        if p.exists() and p.is_dir():
+            return p
+
+    tried = "\n".join(f"- {str(x)}" for x in candidates) if candidates else "(none)"
+    raise MvsDllNotFoundError(
+        "找不到 MVS 官方 Python 示例绑定目录（MvImport）。\n"
+        "\n"
+        "你需要提供 MvImport 目录（包含 MvCameraControl_class.py 等文件）。\n"
+        "支持方式（按优先级）：\n"
+        "1) 传参：load_mvs_binding(mvimport_dir=...) / CLI 参数 --mvimport-dir\n"
+        "2) 环境变量：MVS_MVIMPORT_DIR=<MvImport目录>\n"
+        "3) 将 MvImport 目录加入 sys.path（不推荐，容易污染环境）\n"
+        "\n"
+        f"已尝试候选目录：\n{tried}"
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class MvsBinding:
     """已加载的 MVS 绑定符号集合。"""
@@ -81,7 +133,7 @@ class MvsBinding:
         return int(self.params.MV_USB_DEVICE)
 
 
-def load_mvs_binding(*, dll_dir: Optional[str] = None) -> MvsBinding:
+def load_mvs_binding(*, mvimport_dir: Optional[str] = None, dll_dir: Optional[str] = None) -> MvsBinding:
     """加载 MVS Python 示例绑定。
 
     Args:
@@ -94,21 +146,8 @@ def load_mvs_binding(*, dll_dir: Optional[str] = None) -> MvsBinding:
         MvsDllNotFoundError: 找不到 MvCameraControl.dll 或其依赖。
     """
 
-    root = repo_root()
-    mvimport_dir = root / "SDK_Development" / "Samples" / "Python" / "MvImport"
-    if not mvimport_dir.exists():
-        raise MvsDllNotFoundError(
-            "MVS python bindings (MvImport) not found in this repo layout.\n"
-            "找不到 MVS 官方 Python 示例绑定目录（MvImport）。\n"
-            "\n"
-            f"Expected: {mvimport_dir}\n"
-            "\n"
-            "解决方法：\n"
-            "1) 确认本仓库包含 SDK_Development/Samples/Python/MvImport；\n"
-            "2) 如果你移动了 SDK_Development 目录，请把它放回仓库根目录；\n"
-            "3) 或者改用已安装的 MVS Python 包（若你的环境提供）。"
-        )
-    _ensure_mvimport_on_syspath(mvimport_dir)
+    mvimport_path = _resolve_mvimport_dir(mvimport_dir=mvimport_dir)
+    _ensure_mvimport_on_syspath(mvimport_path)
 
     # 1) 用户指定目录
     if dll_dir:
@@ -118,10 +157,6 @@ def load_mvs_binding(*, dll_dir: Optional[str] = None) -> MvsBinding:
     env_dir = os.environ.get("MVS_DLL_DIR")
     if env_dir:
         _ensure_dll_dir(Path(env_dir))
-
-    # 3) 工作区内候选目录（当前仓库通常没有 dll，但保留逻辑）
-    _ensure_dll_dir(root / "SDK_Development" / "Bin" / "win64")
-    _ensure_dll_dir(root / "SDK_Development" / "Bin" / "win32")
 
     try:
         mv = importlib.import_module("MvCameraControl_class")
@@ -135,7 +170,7 @@ def load_mvs_binding(*, dll_dir: Optional[str] = None) -> MvsBinding:
             "解决方法：\n"
             "1) 安装海康 MVS（Machine Vision Software），确保系统 PATH 可找到 MvCameraControl.dll；\n"
             "2) 或使用参数 dll_dir / 环境变量 MVS_DLL_DIR 指向 DLL 目录；\n"
-            "3) 注意：本仓库的 SDK_Development/Bin 下通常只有示例 exe，没有 dll。"
+            "3) 提示：MvCameraControl.dll 通常位于 MVS 安装目录的 Runtime/Bin 之类路径。"
         ) from exc
 
     return MvsBinding(MvCamera=mv.MvCamera, params=params, err=err)
