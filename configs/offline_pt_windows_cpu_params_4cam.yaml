@@ -16,7 +16,15 @@ time_sync_mode: dev_timestamp_mapping
 # time_mapping_path: data/captures_master_slave/tennis_offline/time_mapping_dev_to_host_ms.json
 
 # 标定文件：由 data/calibration/inputs/2026-01-30/*.json 融合生成（单位：m）
-calib: data/calibration/params_4cam_calib.json
+calib: data/calibration/camera_extrinsics_C_T_B.json
+
+# - pixel_format 为空表示不设置（沿用相机当前配置）。
+# - image_width/image_height 必须同时设置；不设置就删掉/留空。
+pixel_format: BayerRG8
+image_width: 1980
+image_height: 1080
+image_offset_x: 200
+image_offset_y: 400
 
 # 可选：只使用指定相机序列号（serial）参与检测/定位。
 # 建议显式写出来，避免输入数据 camera_name 与标定 key 不一致导致相机被静默跳过。
@@ -34,7 +42,7 @@ detector: pt
 model: data/models/best.pt
 
 # 置信度阈值：会传给 detector，同时也会作为 pipeline 的 min_score
-min_score: 0.25
+min_score: 0.20
 
 # 至少需要几路相机同时检测到球，才会做三角化输出 3D
 require_views: 2
@@ -50,6 +58,20 @@ max_groups: 0
 
 curve:
   enabled: true
+  compare_v2: false
+  compare_v3_legacy: false
+  max_tracks: 4
+  association_dist_m: 2.0
+  max_missed_s: 0.6
+  min_dt_s: 0.000001
+  # corridor_y_min: 0.6
+  # corridor_y_max: 1.2
+  corridor_y_min: 0.9
+  corridor_y_max: 1.0
+  corridor_y_step: 0.1
+  conf_from: quality
+  constant_conf: 1.0
+  is_bot_fire: -1
 
 # 输出 JSONL 路径（每行一个结果记录）
 out_jsonl: data/tools_output/offline_positions_3d.params_4cam.jsonl

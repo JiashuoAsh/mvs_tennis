@@ -29,6 +29,12 @@ class CurveStageConfig:
 
     enabled: bool = False
 
+    # 主输出算法：
+    # - v3：输出落点/落地时间/走廊（默认）
+    # - v2：输出 legacy 的接球点候选（curve2）
+    # - v3_legacy：输出 v3 的 legacy 适配层接球点候选
+    primary: str = "v3"  # v3|v2|v3_legacy
+
     # 对比开关：用于离线评测 v2 vs v3。
     compare_v2: bool = False
     compare_v3_legacy: bool = False
@@ -47,6 +53,14 @@ class CurveStageConfig:
     # 点级置信度来源
     conf_from: str = "quality"  # quality|constant
     constant_conf: float = 1.0
+
+    # 可选：对输入到 curve 的坐标做轻量变换。
+    # 说明：
+    # - 仅影响“传给 curve_v3/v2/legacy 的观测值”，不会修改上游定位输出 balls[*].ball_3d_world。
+    # - 默认不变换（保持旧行为）。
+    # - 若你的坐标系需要把 y 轴翻转并做零点校正，可用：y' = -(y - y_offset_m)。
+    y_offset_m: float = 0.0
+    y_negate: bool = False
 
     # legacy 需要的字段（沿用旧接口约定）
     is_bot_fire: int = -1
@@ -319,15 +333,56 @@ def _track_snapshot(track: _Track, cfg: CurveStageConfig) -> dict[str, Any]:
 
         out["v3"] = out_v3
 
-    if cfg.compare_v3_legacy and track.v3_legacy is not None:
-        # legacy 的输出就是“接球点候选列表”；此处仅作为对比落盘。
+    def _num_list(x: Any) -> list[float | None] | None:
+        if not isinstance(x, (list, tuple)):
+            return None
+        out2: list[float | None] = []
+        for v in x:
+            if v is None:
+                out2.append(None)
+                continue
+            fv = _as_float(v)
+            if fv is None or not math.isfinite(float(fv)):
+                out2.append(None)
+            else:
+                out2.append(float(fv))
+        return out2
+
+    if (cfg.primary == "v3_legacy" or cfg.compare_v3_legacy) and track.v3_legacy is not None:
+        # legacy 的输出就是“接球点候选列表”；可用于单独验证 v3 legacy 行为。
         out["v3_legacy"] = {
             "last_receive_points": getattr(track, "_last_v3_legacy_points", None),
         }
 
-    if cfg.compare_v2 and track.v2 is not None:
+    if (cfg.primary == "v2" or cfg.compare_v2) and track.v2 is not None:
+        v2 = track.v2
+
+        cur_land_speed = None
+        try:
+            seg_id, ls0, ls1 = v2.get_current_curve_land_speed()
+            cur_land_speed = {
+                "seg_id": int(seg_id),
+                "curve0": _num_list(ls0),
+                "curve1": _num_list(ls1),
+            }
+        except Exception:
+            cur_land_speed = None
+
+        bounce_speed = None
+        try:
+            seg_id2, land0, bounce = v2.get_bounce_speed()
+            bounce_speed = {
+                "seg_id": int(seg_id2),
+                "land_speed_curve0": _num_list(land0),
+                "bounce_speed": _num_list(bounce),
+            }
+        except Exception:
+            bounce_speed = None
+
         out["v2"] = {
             "last_receive_points": getattr(track, "_last_v2_points", None),
+            "current_curve_land_speed": cur_land_speed,
+            "bounce_speed": bounce_speed,
         }
 
     return out
@@ -342,35 +397,57 @@ class CurveStage:
         self._tracks: list[_Track] = []
 
         # 延迟 import：避免在未启用时引入 curve 相关依赖与启动开销。
+        self._imports_ready = False
         self._CurvePredictorV3 = None
         self._BallObservation = None
         self._CurveV2 = None
         self._CurveV3Legacy = None
 
     def _ensure_curve_imports(self) -> None:
-        if self._CurvePredictorV3 is not None:
+        if bool(self._imports_ready):
             return
 
-        from curve.curve_v3.core import CurvePredictorV3
-        from curve.curve_v3.types import BallObservation
+        # 仅按需引入，避免未使用算法的启动开销。
+        need_v3 = str(self._cfg.primary) == "v3"
+        need_v2 = str(self._cfg.primary) == "v2" or bool(self._cfg.compare_v2)
+        need_v3_legacy = str(self._cfg.primary) == "v3_legacy" or bool(self._cfg.compare_v3_legacy)
 
-        self._CurvePredictorV3 = CurvePredictorV3
-        self._BallObservation = BallObservation
+        if need_v3:
+            from curve.curve_v3.core import CurvePredictorV3
+            from curve.curve_v3.types import BallObservation
 
-        if self._cfg.compare_v2:
+            self._CurvePredictorV3 = CurvePredictorV3
+            self._BallObservation = BallObservation
+
+        if need_v2:
             from curve.curve_v2 import Curve as CurveV2
 
             self._CurveV2 = CurveV2
-        if self._cfg.compare_v3_legacy:
+
+        if need_v3_legacy:
             from curve.curve_v3.legacy import Curve as CurveV3Legacy
 
             self._CurveV3Legacy = CurveV3Legacy
+
+        self._imports_ready = True
 
     def reset(self) -> None:
         """清空所有 track 状态。"""
 
         self._tracks.clear()
         self._next_track_id = 1
+
+    def _transform_y(self, y: float) -> float:
+        """对输入到 curve 的 y 做可选变换。
+
+        公式：y' = sign * (y - offset)
+        其中 sign = -1 当 cfg.y_negate=True，否则为 +1。
+        """
+
+        y2 = float(y) - float(self._cfg.y_offset_m)
+        if bool(self._cfg.y_negate):
+            y2 = -float(y2)
+        return float(y2)
 
     def process_record(self, out_rec: dict[str, Any]) -> dict[str, Any]:
         """处理单条定位输出记录，返回增强后的记录。"""
@@ -400,7 +477,8 @@ class CurveStage:
 
         # 逐球贪心分配：质量高的先处理。
         for m in meas:
-            pos = (float(m.x), float(m.y), float(m.z))
+            y_in = self._transform_y(float(m.y))
+            pos = (float(m.x), float(y_in), float(m.z))
 
             best_tr: _Track | None = None
             best_d = float("inf")
@@ -428,11 +506,14 @@ class CurveStage:
                 tr = _Track(track_id=int(self._next_track_id))
                 self._next_track_id += 1
 
-                # 创建拟合器
-                tr.v3 = self._CurvePredictorV3()  # type: ignore[operator]
-                if self._cfg.compare_v2 and self._CurveV2 is not None:
+                # 创建拟合器（primary + 可选 compare）。
+                if self._cfg.primary == "v3" and self._CurvePredictorV3 is not None:
+                    tr.v3 = self._CurvePredictorV3()  # type: ignore[operator]
+
+                if (self._cfg.primary == "v2" or self._cfg.compare_v2) and self._CurveV2 is not None:
                     tr.v2 = self._CurveV2()  # type: ignore[operator]
-                if self._cfg.compare_v3_legacy and self._CurveV3Legacy is not None:
+
+                if (self._cfg.primary == "v3_legacy" or self._cfg.compare_v3_legacy) and self._CurveV3Legacy is not None:
                     tr.v3_legacy = self._CurveV3Legacy()  # type: ignore[operator]
 
                 self._tracks.append(tr)
@@ -445,24 +526,38 @@ class CurveStage:
                     continue
 
             conf = _obs_conf(self._cfg, m.quality)
-            obs = self._BallObservation(x=float(m.x), y=float(m.y), z=float(m.z), t=float(t_abs), conf=conf)  # type: ignore[misc]
-            try:
-                if best_tr.v3 is not None:
-                    best_tr.v3.add_observation(obs)
-            except Exception:
-                pass
 
-            # 可选对比：v2 / v3 legacy 的输出记录到 track 上（仅记录“最后一次输出”）。
-            if self._cfg.compare_v2 and best_tr.v2 is not None:
+            # v3：新 API（落点/走廊）。
+            if best_tr.v3 is not None and self._BallObservation is not None:
                 try:
-                    pts = best_tr.v2.add_frame([float(m.x), float(m.y), float(m.z), float(t_abs)], is_bot_fire=int(self._cfg.is_bot_fire))
+                    obs = self._BallObservation(  # type: ignore[misc]
+                        x=float(m.x),
+                        y=float(y_in),
+                        z=float(m.z),
+                        t=float(t_abs),
+                        conf=conf,
+                    )
+                    best_tr.v3.add_observation(obs)
+                except Exception:
+                    pass
+
+            # v2/v3_legacy：legacy API（接球点候选），记录“最后一次输出”。
+            if best_tr.v2 is not None:
+                try:
+                    pts = best_tr.v2.add_frame(
+                        [float(m.x), float(y_in), float(m.z), float(t_abs)],
+                        is_bot_fire=int(self._cfg.is_bot_fire),
+                    )
                 except Exception:
                     pts = None
                 setattr(best_tr, "_last_v2_points", pts)
 
-            if self._cfg.compare_v3_legacy and best_tr.v3_legacy is not None:
+            if best_tr.v3_legacy is not None:
                 try:
-                    pts = best_tr.v3_legacy.add_frame([float(m.x), float(m.y), float(m.z), float(t_abs)], is_bot_fire=int(self._cfg.is_bot_fire))
+                    pts = best_tr.v3_legacy.add_frame(
+                        [float(m.x), float(y_in), float(m.z), float(t_abs)],
+                        is_bot_fire=int(self._cfg.is_bot_fire),
+                    )
                 except Exception:
                     pts = None
                 setattr(best_tr, "_last_v3_legacy_points", pts)
@@ -490,6 +585,7 @@ class CurveStage:
 
         # 输出增强字段
         out_rec["curve"] = {
+            "primary": str(self._cfg.primary),
             "t_abs": float(t_abs),
             "t_source": str(t_source),
             "assignments": assignments,

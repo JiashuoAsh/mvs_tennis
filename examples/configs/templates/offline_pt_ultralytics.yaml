@@ -1,10 +1,17 @@
 ﻿# 离线 3D 定位配置模板（pt 检测器：Ultralytics YOLOv8 .pt / Windows 友好）
 #
+# 说明：这是“全字段模板”。字段与 `src/tennis3d/config.py` 完全对齐：
+# - 有默认值的字段：写出默认值，方便你了解程序默认行为
+# - 必填但没有默认值的字段：使用占位符（<...>），需要你手动替换
+#
 # 用法示例：
 # - uv run python -m tennis3d.apps.offline_localize_from_captures --config examples/configs/templates/offline_pt_ultralytics.yaml
 
-captures_dir: data/captures_master_slave/tennis_test
-calib: data/calibration/example_triple_camera_calib.json
+# captures 目录：要求包含 metadata.jsonl（由 python -m mvs.apps.quad_capture 生成）
+captures_dir: <PATH_TO_CAPTURES_DIR>
+
+# 标定文件：支持 .json/.yaml/.yml（字段见 examples/configs/templates/calibration_multi_camera.yaml）
+calib: <PATH_TO_CALIB_JSON_OR_YAML>
 
 # 可选：只使用指定相机序列号（serial）参与检测/定位。
 # - 不写：默认使用 captures 中出现的全部相机。
@@ -17,9 +24,8 @@ calib: data/calibration/example_triple_camera_calib.json
 # Windows 上推荐 pt（不依赖 rknn 运行时）。
 detector: pt
 
-# detector=pt 时必填（.pt）
-# 建议使用相对路径，方便项目搬迁；也可写绝对路径。
-model: data/models/best.pt
+# detector=pt 时必填（.pt）。建议使用相对路径，方便项目搬迁。
+model: <PATH_TO_MODEL_PT>
 
 min_score: 0.25
 require_views: 2
@@ -32,4 +38,31 @@ merge_dist_m: 0.08
 
 max_groups: 0
 
-out_jsonl: data/tools_output/offline_positions_3d.pt.template.jsonl
+# 输出 JSONL 路径（每行一个结果记录）。默认值如下：
+out_jsonl: data/tools_output/offline_positions_3d.jsonl
+
+# 时间轴（默认值：frame_host_timestamp）：
+# - frame_host_timestamp：沿用原逻辑，用组内 frames[*].host_timestamp 中位数作为 capture_t_abs
+# - dev_timestamp_mapping：使用预先拟合的 dev_timestamp -> host_ms 映射，把组时间贴近曝光时刻
+time_sync_mode: frame_host_timestamp
+
+# 可选：映射文件路径。
+# - 仅在 time_sync_mode=dev_timestamp_mapping 时生效
+# - 为空表示使用默认路径：<captures_dir>/time_mapping_dev_to_host_ms.json
+time_mapping_path: ""
+
+# 可选：轨迹拟合后处理（curve v3）。默认 disabled。
+curve:
+  enabled: false
+  compare_v2: false
+  compare_v3_legacy: false
+  max_tracks: 4
+  association_dist_m: 0.6
+  max_missed_s: 0.6
+  min_dt_s: 0.000001
+  corridor_y_min: 0.6
+  corridor_y_max: 1.6
+  corridor_y_step: 0.1
+  conf_from: quality
+  constant_conf: 1.0
+  is_bot_fire: -1

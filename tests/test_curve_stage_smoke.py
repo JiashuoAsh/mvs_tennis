@@ -55,6 +55,79 @@ def test_curve_stage_adds_curve_field_and_track_id() -> None:
     assert v3.get("time_base_abs") == t0
 
 
+def test_curve_stage_primary_v2_outputs_v2_only() -> None:
+    cfg = CurveStageConfig(
+        enabled=True,
+        primary="v2",
+        max_tracks=2,
+        association_dist_m=10.0,
+        max_missed_s=10.0,
+    )
+
+    t0 = 1000.0
+    records_in = [_make_rec(t_abs=t0 + i * 0.01, x=0.1 * i, y=1.5 - 0.2 * i, z=3.0) for i in range(6)]
+    records_out = list(apply_curve_stage(records_in, cfg))
+
+    last = records_out[-1]
+    assert last.get("curve", {}).get("primary") == "v2"
+
+    balls = last.get("balls")
+    assert isinstance(balls, list) and balls
+    assert isinstance(balls[0], dict)
+    assert balls[0].get("curve_track_id") == 1
+
+    tu = last["curve"]["track_updates"]
+    assert isinstance(tu, list) and len(tu) == 1
+    assert "v2" in tu[0]
+    assert "v3" not in tu[0]
+    assert "v3_legacy" not in tu[0]
+
+
+def test_curve_stage_primary_v3_legacy_outputs_v3_legacy_only() -> None:
+    cfg = CurveStageConfig(
+        enabled=True,
+        primary="v3_legacy",
+        max_tracks=2,
+        association_dist_m=10.0,
+        max_missed_s=10.0,
+    )
+
+    t0 = 1000.0
+    records_in = [_make_rec(t_abs=t0 + i * 0.01, x=0.1 * i, y=1.5 - 0.2 * i, z=3.0) for i in range(6)]
+    records_out = list(apply_curve_stage(records_in, cfg))
+
+    last = records_out[-1]
+    assert last.get("curve", {}).get("primary") == "v3_legacy"
+
+    tu = last["curve"]["track_updates"]
+    assert isinstance(tu, list) and len(tu) == 1
+    assert "v3_legacy" in tu[0]
+    assert "v3" not in tu[0]
+    assert "v2" not in tu[0]
+
+
+def test_curve_stage_applies_y_transform_to_curve_input() -> None:
+    cfg = CurveStageConfig(
+        enabled=True,
+        max_tracks=1,
+        association_dist_m=10.0,
+        max_missed_s=10.0,
+        y_offset_m=0.13,
+        y_negate=True,
+    )
+
+    rec_in = _make_rec(t_abs=1000.0, x=0.0, y=1.0, z=0.0)
+    rec_out = list(apply_curve_stage([rec_in], cfg))[0]
+
+    tu = rec_out["curve"]["track_updates"]
+    assert isinstance(tu, list) and len(tu) == 1
+    last_pos = tu[0].get("last_pos")
+    assert isinstance(last_pos, list) and len(last_pos) == 3
+
+    # 期望：y' = -(y - 0.13) = -0.87
+    assert abs(float(last_pos[1]) - (-0.87)) < 1e-9
+
+
 def test_offline_config_accepts_curve_section(tmp_path: Path) -> None:
     cfg_path = tmp_path / "offline_cfg.json"
     cfg_path.write_text(
@@ -68,6 +141,8 @@ def test_offline_config_accepts_curve_section(tmp_path: Path) -> None:
                     "max_tracks": 2,
                     "conf_from": "constant",
                     "constant_conf": 0.5,
+                    "y_offset_m": 0.13,
+                    "y_negate": True,
                 },
             },
             ensure_ascii=False,
@@ -80,3 +155,5 @@ def test_offline_config_accepts_curve_section(tmp_path: Path) -> None:
     assert int(cfg.curve.max_tracks) == 2
     assert str(cfg.curve.conf_from) == "constant"
     assert float(cfg.curve.constant_conf) == 0.5
+    assert float(cfg.curve.y_offset_m) == 0.13
+    assert bool(cfg.curve.y_negate) is True

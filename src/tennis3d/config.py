@@ -55,9 +55,43 @@ def _as_optional_path(x: Any) -> Path | None:
     return Path(s).expanduser()
 
 
+def _as_optional_positive_int(x: Any) -> int | None:
+    """把可能为 None/0/空的值解析成可选正整数。
+
+    约定：
+        - None/""/0 -> None（表示“不设置”）
+        - >0 -> int
+    """
+
+    if x is None:
+        return None
+    try:
+        v = int(x)
+    except Exception:
+        s = str(x).strip()
+        if not s:
+            return None
+        v = int(s)
+
+    if v <= 0:
+        return None
+    return int(v)
+
+
+def _as_int(x: Any, default: int = 0) -> int:
+    if x is None:
+        return int(default)
+    try:
+        return int(x)
+    except Exception:
+        s = str(x).strip()
+        return int(s) if s else int(default)
+
+
 _DETECTOR = Literal["fake", "color", "rknn", "pt"]
 _GROUP_BY = Literal["trigger_index", "frame_num", "sequence"]
 _TIME_SYNC_MODE = Literal["frame_host_timestamp", "dev_timestamp_mapping"]
+_TERMINAL_PRINT_MODE = Literal["best", "all", "none"]
 
 
 def _as_detector(x: Any, default: str) -> _DETECTOR:
@@ -83,6 +117,13 @@ def _as_time_sync_mode(x: Any, default: str) -> _TIME_SYNC_MODE:
     return cast(_TIME_SYNC_MODE, s)
 
 
+def _as_terminal_print_mode(x: Any, default: str) -> _TERMINAL_PRINT_MODE:
+    s = str(x if x is not None else default).strip().lower()
+    if s not in {"best", "all", "none"}:
+        raise RuntimeError(f"unknown terminal_print_mode: {s} (expected: best|all|none)")
+    return cast(_TERMINAL_PRINT_MODE, s)
+
+
 def _as_curve_stage_config(x: Any) -> CurveStageConfig:
     """解析可选的 curve stage 配置段。
 
@@ -96,12 +137,17 @@ def _as_curve_stage_config(x: Any) -> CurveStageConfig:
     if not isinstance(x, dict):
         raise RuntimeError("config field 'curve' must be an object")
 
+    primary = str(x.get("primary", "v3")).strip().lower()
+    if primary not in {"v3", "v2", "v3_legacy"}:
+        raise RuntimeError("curve.primary must be one of: v3 | v2 | v3_legacy")
+
     conf_from = str(x.get("conf_from", "quality")).strip().lower()
     if conf_from not in {"quality", "constant"}:
         raise RuntimeError("curve.conf_from must be 'quality' or 'constant'")
 
     cfg = CurveStageConfig(
         enabled=bool(x.get("enabled", False)),
+        primary=primary,
         compare_v2=bool(x.get("compare_v2", False)),
         compare_v3_legacy=bool(x.get("compare_v3_legacy", False)),
         max_tracks=int(x.get("max_tracks", 4)),
@@ -113,6 +159,8 @@ def _as_curve_stage_config(x: Any) -> CurveStageConfig:
         corridor_y_step=float(x.get("corridor_y_step", 0.1)),
         conf_from=conf_from,
         constant_conf=float(x.get("constant_conf", 1.0)),
+        y_offset_m=float(x.get("y_offset_m", 0.0)),
+        y_negate=bool(x.get("y_negate", False)),
         is_bot_fire=int(x.get("is_bot_fire", -1)),
     )
 
@@ -140,6 +188,12 @@ class OfflineAppConfig:
     serials: list[str] | None = None
     detector: _DETECTOR = "color"
     model: Path | None = None
+    # detector=pt 时可选：Ultralytics 推理设备。
+    # 说明：
+    # - 默认 cpu（保持旧行为）。
+    # - CUDA 环境可写 cuda:0 / 0 / cuda。
+    # - 该字段仅影响 detector=pt，其它 detector 会忽略。
+    pt_device: str = "cpu"
     min_score: float = 0.25
     require_views: int = 2
     max_detections_per_camera: int = 10
@@ -184,9 +238,26 @@ class OnlineAppConfig:
     max_pending_groups: int = 256
     max_groups: int = 0
 
+    # 采集等待策略：若 >0，则在连续这么久拿不到“完整组包”时退出。
+    # 说明：该参数主要用于排障（例如硬触发线路未接好时避免无限等待）。
+    max_wait_seconds: float = 0.0
+
+    # 可选：相机图像参数（ROI/像素格式）。
+    # 约定：
+    # - pixel_format 为空表示不设置（沿用相机当前配置）。
+    # - image_width/image_height 同时设置才生效；否则将报错。
+    pixel_format: str = ""
+    image_width: int | None = None
+    image_height: int | None = None
+    image_offset_x: int = 0
+    image_offset_y: int = 0
+
     calib: Path = Path("data/calibration/example_triple_camera_calib.json")
     detector: _DETECTOR = "fake"
     model: Path | None = None
+    # detector=pt 时可选：Ultralytics 推理设备（默认 cpu）。
+    # 说明：CUDA 环境可写 cuda:0 / 0 / cuda。
+    pt_device: str = "cpu"
     min_score: float = 0.25
     require_views: int = 2
     max_detections_per_camera: int = 10
@@ -194,6 +265,26 @@ class OnlineAppConfig:
     max_uv_match_dist_px: float = 25.0
     merge_dist_m: float = 0.08
     out_jsonl: Path | None = None
+
+    # JSONL 写盘策略（性能相关）：
+    # - out_jsonl_only_when_balls=true：仅当 balls 非空时才写盘，避免无球阶段刷文件。
+    # - out_jsonl_flush_every_records：每写入 N 条记录就 flush 一次（1 表示每条都 flush，最安全但最慢）。
+    # - out_jsonl_flush_interval_s：距离上次 flush 超过该秒数则 flush（0 表示禁用基于时间的 flush）。
+    # 说明：默认保持旧行为（每条记录 flush），避免改变既有语义。
+    out_jsonl_only_when_balls: bool = False
+    out_jsonl_flush_every_records: int = 1
+    out_jsonl_flush_interval_s: float = 0.0
+
+    # 终端输出策略：
+    # - best：只打印每个 group 的最佳球（更安静，默认）
+    # - all：打印该 group 的所有球（便于调参/排障）
+    # - none：完全静默（不打印逐组球信息；适合追求吞吐或重定向到文件时）
+    terminal_print_mode: _TERMINAL_PRINT_MODE = "best"
+
+    # 可选：周期性输出“状态心跳”，用于无球阶段确认程序仍在跑，以及观察吞吐。
+    # - 0 表示关闭（默认）。
+    # - >0 表示每隔这么多秒打印一行统计。
+    terminal_status_interval_s: float = 0.0
 
     # 在线时间轴：默认仍用 frames[*].host_timestamp 中位数。
     # 若需要更贴近曝光时刻，可启用方案B在线滑窗映射（dev_timestamp -> host_ms）。
@@ -247,6 +338,7 @@ def load_offline_app_config(path: Path) -> OfflineAppConfig:
         serials=serials,
         detector=_as_detector(data.get("detector"), "color"),
         model=_as_optional_path(data.get("model")),
+        pt_device=str(data.get("pt_device", "cpu") or "cpu").strip() or "cpu",
         min_score=float(data.get("min_score", 0.25)),
         require_views=int(data.get("require_views", 2)),
         max_detections_per_camera=int(data.get("max_detections_per_camera", 10)),
@@ -297,6 +389,35 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
     time_mapping_min_points = int(data.get("time_mapping_min_points", 20))
     time_mapping_hard_outlier_ms = float(data.get("time_mapping_hard_outlier_ms", 50.0))
 
+    terminal_print_mode = _as_terminal_print_mode(data.get("terminal_print_mode"), "best")
+    terminal_status_interval_s = float(data.get("terminal_status_interval_s", 0.0))
+
+    out_jsonl_only_when_balls = bool(data.get("out_jsonl_only_when_balls", False))
+    out_jsonl_flush_every_records = int(data.get("out_jsonl_flush_every_records", 1))
+    out_jsonl_flush_interval_s = float(data.get("out_jsonl_flush_interval_s", 0.0))
+
+    # 约束：flush_every_records 必须为非负整数。
+    # - 0 表示禁用“按条数 flush”，仅依赖 flush_interval_s 或最终 close。
+    # - 1 表示每条都 flush（旧行为）。
+    if out_jsonl_flush_every_records < 0:
+        raise RuntimeError("online config out_jsonl_flush_every_records must be >= 0")
+    if out_jsonl_flush_interval_s < 0:
+        raise RuntimeError("online config out_jsonl_flush_interval_s must be >= 0")
+    if terminal_status_interval_s < 0:
+        raise RuntimeError("online config terminal_status_interval_s must be >= 0")
+
+    pixel_format = str(data.get("pixel_format", "") or "").strip()
+    image_width = _as_optional_positive_int(data.get("image_width"))
+    image_height = _as_optional_positive_int(data.get("image_height"))
+    image_offset_x = _as_int(data.get("image_offset_x"), 0)
+    image_offset_y = _as_int(data.get("image_offset_y"), 0)
+
+    # 约束：宽高必须同时设置，避免出现“只裁宽不裁高”的歧义。
+    if (image_width is None) ^ (image_height is None):
+        raise RuntimeError(
+            "online config ROI 参数错误：image_width 与 image_height 必须同时设置，或同时不设置。"
+        )
+
     return OnlineAppConfig(
         mvimport_dir=_as_optional_path(data.get("mvimport_dir")),
         dll_dir=_as_optional_path(data.get("dll_dir")),
@@ -306,9 +427,16 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         group_timeout_ms=int(data.get("group_timeout_ms", 1000)),
         max_pending_groups=int(data.get("max_pending_groups", 256)),
         max_groups=int(data.get("max_groups", 0)),
+        max_wait_seconds=float(data.get("max_wait_seconds", 0.0)),
+        pixel_format=pixel_format,
+        image_width=image_width,
+        image_height=image_height,
+        image_offset_x=int(image_offset_x),
+        image_offset_y=int(image_offset_y),
         calib=_as_path(data.get("calib", "data/calibration/example_triple_camera_calib.json")),
         detector=_as_detector(data.get("detector"), "fake"),
         model=_as_optional_path(data.get("model")),
+        pt_device=str(data.get("pt_device", "cpu") or "cpu").strip() or "cpu",
         min_score=float(data.get("min_score", 0.25)),
         require_views=int(data.get("require_views", 2)),
         max_detections_per_camera=int(data.get("max_detections_per_camera", 10)),
@@ -316,6 +444,11 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         max_uv_match_dist_px=float(data.get("max_uv_match_dist_px", 25.0)),
         merge_dist_m=float(data.get("merge_dist_m", 0.08)),
         out_jsonl=_as_optional_path(data.get("out_jsonl")),
+        out_jsonl_only_when_balls=out_jsonl_only_when_balls,
+        out_jsonl_flush_every_records=out_jsonl_flush_every_records,
+        out_jsonl_flush_interval_s=out_jsonl_flush_interval_s,
+        terminal_print_mode=terminal_print_mode,
+        terminal_status_interval_s=terminal_status_interval_s,
         time_sync_mode=time_sync_mode,
         time_mapping_warmup_groups=time_mapping_warmup_groups,
         time_mapping_window_groups=time_mapping_window_groups,

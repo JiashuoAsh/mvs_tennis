@@ -97,7 +97,12 @@ python -m tennis3d.apps.online_mvs_localize --config path/to/online.yaml
 - `--calib`：标定文件（支持 `.json/.yaml/.yml`）
 - `--detector`：`fake` / `color` / `rknn`
 - `--require-views`：三角化所需的最少视角数（建议保持 >=2；当 4 台里只有 1 台看到球时，本帧不会输出 3D）
-- `--out-jsonl`：可选，输出 JSONL（不传则只打印）
+- `--out-jsonl`：可选，输出 JSONL（不传则在终端输出）
+
+终端输出说明：
+
+- 在线模式默认**仅在观测到球**（`balls` 非空）时打印一行，包含 `group_index` 与 `ball_3d_world`（世界坐标系 3D）。
+- 这样可以在“无球阶段”避免刷屏；一旦开始有球，就会持续打印每次观测到的球位置。
 
 ### 离线 3D 定位
 
@@ -429,7 +434,7 @@ python -m mvs.apps.quad_capture \
 	--gain-auto Off --gain 15 \
 	--save-mode sdk-bmp \
 	--soft-trigger-fps 18 \
-	--max-groups 20 \
+	--max-groups 0 \
 	--max-wait-seconds 10 \
     --image-width 2448 \
 	--image-height 2048 \
@@ -462,6 +467,27 @@ python -m mvs.apps.quad_capture \
     --image-offset-y 0 \
 	--pixel-format BayerRG8
 
+```
+
+
+#### 常用指令
+
+```bash
+uv run python tools/mvs_relayout_by_camera.py \
+  --captures-dir data/captures_master_slave/for_calib \
+  --output-dir data/captures_master_slave/for_calib_by_camera
+
+
+uv run python tools/generate_params_4cam_calib.py \
+  --intrinsics-dir data/calibration/inputs/2026-01-30 \
+  --extrinsics-file data/calibration/base_to_camera_extrinsics.json \
+  --out data/calibration/params_4cam_calib.json \
+  --map cam0=DA8199303 \
+  --map cam1=DA8199402 \
+  --map cam2=DA8199243 \
+  --map cam3=DA8199285
+
+uv run python tools/mvs_fit_time_mapping.py --captures-dir data/captures_master_slave/tennis_offline
 
 ```
 
@@ -544,3 +570,65 @@ PYTHONPATH=src python tools/mvs_relayout_by_camera.py \
 1) **减数据量**：ROI / 降分辨率 / 降位深 / 合理像素格式。
 2) **增带宽**：多网卡分流、每台相机独立网口/独立交换机、升级到 10GbE。
 3) **减主机开销**：先用 `--save-mode none` 测上限；保存时尽量用 SSD、避免 BMP 转码成为瓶颈。
+
+---
+
+## Troubleshooting（常见问题）
+
+### 1) 传了 `--image-width/--image-height`，但实际分辨率变小（例如 2448×2048 变成 2248×1648）
+
+现象：
+
+- CLI 打印的采集配置里显示：`roi=2448x2048 offset=(0,0)`
+- 但启动后“带宽估算”里每台相机显示的是更小的分辨率，例如：`2248x1648`
+
+原因（最常见）：
+
+- 相机上一次运行/在 MVS Client 里被设置过非零 ROI 偏移（`OffsetX/OffsetY`）。
+- 许多机型的 ROI 约束是：
+	- $Width \le SensorWidth - OffsetX$
+	- $Height \le SensorHeight - OffsetY$
+	因此当历史 `OffsetX/OffsetY` 不为 0 时，你请求的宽高会被相机按最大允许值“卡小”。
+
+如何确认：
+
+- 看采集启动后的“带宽估算”行：它会读取相机当前的 `Width/Height/PayloadSize/PixelFormat` 并打印。
+- 如果你看到的宽高差值很“整齐”（例如少 200、少 400），基本就是 offset 残留导致的上限变化。
+
+解决步骤：
+
+1) 确认你确实传了你想要的 ROI：
+	 - `--image-width 2448 --image-height 2048 --image-offset-x 0 --image-offset-y 0`
+2) 用最新代码重试（本仓库已修复一个“读取 Width/Height 范围前未可靠归零 Offset”的顺序问题）。
+3) 如果仍然被卡小：打开 MVS Client，手动把该相机的 ROI 参数恢复到全幅：
+	 - `OffsetX=0, OffsetY=0`
+	 - `Width/Height` 调到最大（或你目标值）
+	 然后关闭 MVS Client（避免占用相机），再运行采集脚本。
+
+预期验证标准：
+
+- 采集启动后，“带宽估算”里每台相机都应显示期望的 `WidthxHeight`（例如 2448×2048）。
+
+### 2) `OpenDevice ... MV_E_ACCESS_DENIED` / 相机被占用
+
+现象：
+
+- 启动采集时报错无访问权限，常见原因是相机正在被 MVS Client 或另一个脚本占用。
+
+解决步骤：
+
+- 关闭所有可能占用相机的软件（尤其是 MVS Client）。
+- 等 2~5 秒后重试；必要时给相机断电重启。
+
+### 3) master/slave 硬触发模式下只有 master 出图、一直凑不齐组包
+
+现象：
+
+- master 使用 Software 触发能出图，但 slaves 配置为 `Line0/Line1...` 后一直没有完整组包。
+
+排查要点：
+
+- 确认物理接线：master 输出线（例如 Line1）必须接到每台 slave 的触发输入线（例如 Line0）。
+- 确认 master 的输出信号源已配置：例如 `--master-line-source ExposureStartActive`。
+- 想先排除硬触发链路问题，可临时切到纯软件触发验证采集链路：
+	- `--trigger-source Software --soft-trigger-fps 5`

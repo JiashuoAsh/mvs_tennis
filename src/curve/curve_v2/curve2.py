@@ -1035,7 +1035,7 @@ class Curve:
         if self.is_debug:
             print(f"start_cnt: {start_cnt}, n_sample: {n_sample}")
 
-        if n_sample < 5 or (id == 0 and n_sample < self.move_frames_threshold[0]):
+        if n_sample < 2 or (id == 0 and n_sample < self.move_frames_threshold[0]):
             return None
 
         if n_sample > 25:  # 拟合最多的帧数，保证曲线0的质量

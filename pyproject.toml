@@ -9,6 +9,7 @@ description = "Multi-camera (Hikrobot MVS) capture + tennis ball 3D localization
 readme = "readme.md"
 requires-python = ">=3.10"
 dependencies = [
+  "matplotlib>=3.10.8",
   "numpy",
   "opencv-python",
   "pyyaml",

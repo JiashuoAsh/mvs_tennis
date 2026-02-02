@@ -115,29 +115,36 @@ def configure_resolution(
     if int(width) <= 0 or int(height) <= 0:
         raise ValueError("width/height 必须为正")
 
+    def _try_set_int_node(key: str, value: int) -> bool:
+        """尽力设置 int 节点。
+
+        说明：
+            - MVS 的 SetIntValue 通常用返回码表示失败，并不一定抛异常。
+            - ROI 场景下我们更希望“尽力修正历史状态”，而不是因为某个节点不可写就中断流程。
+        """
+
+        try:
+            ret = int(cam.MV_CC_SetIntValue(str(key), int(value)))
+        except Exception:
+            return False
+        return int(ret) == int(binding.MV_OK)
+
+    # 关键点：Width/Height 的最大值经常受当前 OffsetX/OffsetY 影响。
+    # 如果相机之前被配置过非零 offset，那么在读取 Width/Height 范围时会看到被“缩小”的 max。
+    # 因此先尽力把 Offset 归零，再读取 Width/Height 的范围来计算目标值。
+    _try_set_int_node("OffsetX", 0)
+    _try_set_int_node("OffsetY", 0)
+
     w_info = _get_int_node_info(binding=binding, cam=cam, key="Width")
     h_info = _get_int_node_info(binding=binding, cam=cam, key="Height")
     if w_info is None or h_info is None:
-        raise MvsError(
-            "无法读取 Width/Height 节点信息：该机型可能不支持 ROI，或当前节点不可读。"
-        )
+        raise MvsError("无法读取 Width/Height 节点信息：该机型可能不支持 ROI，或当前节点不可读。")
 
     _, w_min, w_max, w_inc = w_info
     _, h_min, h_max, h_inc = h_info
 
     target_w = _align_down(int(width), vmin=w_min, vmax=w_max, inc=w_inc)
     target_h = _align_down(int(height), vmin=h_min, vmax=h_max, inc=h_inc)
-
-    # 为避免 Offset 与 Width/Height 的约束互相卡死，先尽力把 Offset 归零。
-    # 部分机型 OffsetX/OffsetY 不存在或不可写：失败忽略。
-    try:
-        cam.MV_CC_SetIntValue("OffsetX", 0)
-    except Exception:
-        pass
-    try:
-        cam.MV_CC_SetIntValue("OffsetY", 0)
-    except Exception:
-        pass
 
     ret = cam.MV_CC_SetIntValue("Width", int(target_w))
     _check(ret, binding.MV_OK, f"SetIntValue(Width={target_w})")
@@ -160,6 +167,22 @@ def configure_resolution(
         oy = _align_down(int(offset_y), vmin=oy_min, vmax=oy_max, inc=oy_inc)
         ret = cam.MV_CC_SetIntValue("OffsetY", int(oy))
         _check(ret, binding.MV_OK, f"SetIntValue(OffsetY={oy})")
+
+    # 二次尝试：某些机型在 offset 调整后，Width/Height 的 max 会变化。
+    # 这一步用于修复“历史 offset 影响 max，导致宽高被误 clamp”的情况。
+    # 若二次设置失败则保持现状（避免改变既有错误处理行为）。
+    w2 = _get_int_node_info(binding=binding, cam=cam, key="Width")
+    h2 = _get_int_node_info(binding=binding, cam=cam, key="Height")
+    if w2 is not None and h2 is not None:
+        cur_w, w_min2, w_max2, w_inc2 = w2
+        cur_h, h_min2, h_max2, h_inc2 = h2
+        target_w2 = _align_down(int(width), vmin=w_min2, vmax=w_max2, inc=w_inc2)
+        target_h2 = _align_down(int(height), vmin=h_min2, vmax=h_max2, inc=h_inc2)
+
+        if int(cur_w) != int(target_w2):
+            _try_set_int_node("Width", int(target_w2))
+        if int(cur_h) != int(target_h2):
+            _try_set_int_node("Height", int(target_h2))
 
 
 def configure_pixel_format(*, binding: MvsBinding, cam: Any, pixel_format: str) -> str:

@@ -139,3 +139,60 @@ def load_calibration(path: Path) -> CalibrationSet:
         )
 
     return CalibrationSet(cameras=out)
+
+
+def apply_sensor_roi_to_calibration(
+    calib: CalibrationSet,
+    *,
+    image_width: int,
+    image_height: int,
+    image_offset_x: int = 0,
+    image_offset_y: int = 0,
+) -> CalibrationSet:
+    """根据传感器 ROI 裁剪，把“满幅标定”转换为 ROI 标定。
+
+    背景：
+        海康 MVS 的 Width/Height + OffsetX/OffsetY 本质是“裁剪 ROI”，不是缩放。
+        因此：
+        - 焦距 fx/fy（以像素为单位）不变
+        - 主点 cx/cy 需要按 ROI 左上角偏移平移
+
+    等价关系：
+        若满幅像素坐标为 (u_full, v_full)，ROI 图像坐标为 (u_roi, v_roi)，则
+        $u_{roi} = u_{full} - offset_x$，$v_{roi} = v_{full} - offset_y$。
+
+        也等价于把内参主点改成：
+        $c'_x = c_x - offset_x$，$c'_y = c_y - offset_y$。
+
+    注意：
+        - 本函数仅处理“裁剪”，不处理后续可能存在的图像缩放/letterbox。
+          （本仓库的 detector 适配已对 letterbox 做了 scale_back；此处不重复。）
+        - 如果你的相机在硬件侧做了 binning/decimation（像素尺寸变化），则 fx/fy 也需要缩放；
+          该情形不在本函数覆盖范围内。
+    """
+
+    w = int(image_width)
+    h = int(image_height)
+    ox = int(image_offset_x)
+    oy = int(image_offset_y)
+
+    if w <= 0 or h <= 0:
+        raise ValueError("image_width/image_height 必须为正（ROI 必须是裁剪窗口）")
+
+    out: dict[str, CameraCalibration] = {}
+    for cam_name, cam in calib.cameras.items():
+        K = np.array(cam.K, dtype=np.float64, copy=True)
+        # 关键点：ROI 裁剪相当于把像素坐标原点平移到 ROI 左上角。
+        K[0, 2] = float(K[0, 2]) - float(ox)
+        K[1, 2] = float(K[1, 2]) - float(oy)
+
+        out[str(cam_name)] = CameraCalibration(
+            name=str(cam.name),
+            image_size=(w, h),
+            K=K,
+            dist=cam.dist,
+            R_wc=cam.R_wc,
+            t_wc=cam.t_wc,
+        )
+
+    return CalibrationSet(cameras=out)

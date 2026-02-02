@@ -42,12 +42,23 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--detector",
         choices=["fake", "color", "rknn", "pt"],
         default="color",
-        help="Detector backend (pt uses Ultralytics YOLOv8 .pt on CPU; color works on Windows without RKNN runtime)",
+        help=(
+            "Detector backend (pt uses Ultralytics YOLOv8 .pt; default device=cpu; "
+            "color works on Windows without RKNN runtime)"
+        ),
     )
     p.add_argument(
         "--model",
         default="",
         help="Model path (required when --detector rknn or pt)",
+    )
+    p.add_argument(
+        "--pt-device",
+        default="cpu",
+        help=(
+            "Ultralytics device for --detector pt (default=cpu). "
+            "CUDA examples: cuda:0 / 0 / cuda"
+        ),
     )
     p.add_argument("--min-score", type=float, default=0.25, help="Ignore detections below this confidence")
     p.add_argument("--require-views", type=int, default=2, help="Minimum camera views required")
@@ -94,6 +105,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         serials = list(cfg.serials) if cfg.serials is not None else None
         detector_name = str(cfg.detector)
         model_path = Path(cfg.model).resolve() if cfg.model is not None else None
+        pt_device = str(getattr(cfg, "pt_device", "cpu") or "cpu").strip() or "cpu"
         min_score = float(cfg.min_score)
         require_views = int(cfg.require_views)
         max_detections_per_camera = int(cfg.max_detections_per_camera)
@@ -111,6 +123,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         serials = [s.strip() for s in (args.serial or []) if str(s).strip()] or None
         detector_name = str(args.detector)
         model_path = (Path(args.model).resolve() if str(args.model).strip() else None)
+        pt_device = str(getattr(args, "pt_device", "cpu") or "cpu").strip() or "cpu"
         min_score = float(args.min_score)
         require_views = int(args.require_views)
         max_detections_per_camera = int(args.max_detections_per_camera)
@@ -147,6 +160,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         name=detector_name,
         model_path=model_path,
         conf_thres=float(min_score),
+        pt_device=pt_device,
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
 

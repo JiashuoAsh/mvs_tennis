@@ -37,6 +37,7 @@ def build_detector(
     name: str,
     model_path: Path | None = None,
     conf_thres: float = 0.25,
+    pt_device: str = "cpu",
 ) -> Detector:
     """创建检测器实例。
 
@@ -44,12 +45,18 @@ def build_detector(
         name: fake/color/rknn/pt。
         model_path: 模型路径（rknn/pt 时必需）。
         conf_thres: 最低置信度阈值。
+        pt_device: detector=pt 时的推理设备（例如 cpu/cuda:0/0）。
 
     Returns:
         Detector。
     """
 
-    return create_detector(name=str(name), model_path=(Path(model_path) if model_path is not None else None), conf_thres=float(conf_thres))
+    return create_detector(
+        name=str(name),
+        model_path=(Path(model_path) if model_path is not None else None),
+        conf_thres=float(conf_thres),
+        pt_device=str(pt_device or "cpu").strip() or "cpu",
+    )
 
 
 def iter_localization_from_captures(

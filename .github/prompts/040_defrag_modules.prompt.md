@@ -16,4 +16,4 @@ agent: "agent"
 3) 执行合并：合并后修复 imports，提供稳定 public API（避免深层 import）。
 4) 自检：至少给 import 冒烟 + 关键入口 --help（若存在）。
 
-约束：不新增依赖；不改业务逻辑；中文注释/log/docstring；引用路径与符号名。
+约束：避免不必要的新增依赖（确需新增时允许：必须说明必要性/替代方案/影响面，并同步更新依赖声明如 pyproject.toml/锁文件与最小验证）；不改业务逻辑；中文注释/log/docstring；引用路径与符号名。

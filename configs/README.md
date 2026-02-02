@@ -1,68 +1,78 @@
-# config YAML 模板（tennis3d online/offline）
+# configs：可直接运行的 YAML 配置
 
-这里的文件是“模板”：字段名与 `src/tennis3d/config.py` 的 loader 保持一致，适合直接复制一份再改成你的参数。
+本目录下的 YAML 是“真正要用/可直接运行”的配置文件（online/offline）。
 
-## 快速用法
+如果你想从模板开始写配置：请从 `examples/configs/templates/` 复制一份到本目录，再替换占位符。
 
-- 离线入口：`src/tennis3d/apps/offline_localize_from_captures.py`
-  - 支持：`--config path/to/offline.yaml`
-- 在线入口：`src/tennis3d/apps/online_mvs_localize.py`
-  - 支持：`--config path/to/online.yaml`
+## 前置条件
 
-## 模板清单
+1) Python 环境
 
-### 离线（offline）
+- 推荐使用 `uv`（仓库根目录下执行）：
+  - 安装依赖：`uv sync`
+  - 运行命令：`uv run python -m ...`
 
-- `offline_color_minimal.yaml`
-  - 最小可用模板：不依赖模型文件，适合先验证“读 captures -> 分组 -> 三角化 -> 输出”的链路。
-- `offline_fake_smoke.yaml`
-  - 冒烟模板：更偏“程序能否跑通”的连通性测试。
-- `offline_pt_ultralytics.yaml`
-  - `.pt` 模型模板：Windows/CPU 上常用（Ultralytics YOLOv8）。
+2) MVS SDK（仅 online 需要）
 
-### 在线（online）
+- 你需要让程序能找到 MVS SDK 的 DLL 以及 Python 绑定（MvImport）。二选一即可：
+  - 配置环境变量：
+    - `MVS_DLL_DIR=<包含 MvCameraControl.dll 的目录>`
+    - `MVS_MVIMPORT_DIR=<包含 MvCameraControl_class.py 等文件的目录>`
+  - 或在 YAML 中填写 `dll_dir` / `mvimport_dir`。
 
-- `online_software_trigger_minimal.yaml`
-  - 最小可用模板：纯软件触发（所有相机 Software，按 `soft_trigger_fps` 发软触发）。
-- `online_master_slave_line1_template.yaml`
-  - 主从触发拓扑模板：只对 master 发软触发，master 通过 LineOut 触发 slave。
+## 配置清单（怎么选）
 
-### 标定（calibration）
+### 在线（online：采集 + 定位）
 
-- `calibration_multi_camera.yaml`
-  - 标定文件结构模板（`tennis3d.geometry.calibration.load_calibration` 可读取）。
+- `online_pt_windows_cpu_software_trigger.yaml`
+  - 纯软件触发（所有相机 Software），适合先把“取流 -> 检测 -> 三角化 -> 终端打印/写 jsonl”跑通。
+- `online_pt_windows_cpu_software_trigger_params_4cam.yaml`
+  - 四相机版本（serials + 标定均为 4cam），并启用 `time_sync_mode: dev_timestamp_mapping`。
+- `online_master_slave_line0.yaml`
+  - 主从触发示例（只对 master 发软触发；slaves 使用 Line0 作为触发输入）。
 
-## 字段要点（最容易踩坑的部分）
+### 离线（offline：读 captures 定位）
 
-1) **标定 cameras 的 key 要匹配 camera_name**
+- `offline_pt_windows_cpu.yaml`
+  - 常用离线配置：Windows/CPU + YOLOv8 `.pt`。
+- `offline_pt_windows_cpu_params_4cam.yaml`
+  - 四相机离线配置（serials 显式列出，且启用 `dev_timestamp_mapping`）。
+- `offline_color_debug.yaml`
+  - 颜色阈值调试配置：不依赖模型文件，适合验证三角化链路。
+- `offline_rknn_board_or_linux.yaml`
+  - RKNN 模板（通常用于 Rockchip 或 Linux 工具链；Windows 上一般不可用）。
 
-- 在线/离线（captures）pipeline 默认用“相机 serial 字符串”作为 camera_name（见 `src/tennis3d/pipeline/sources.py`）。
-- 因此标定文件里 `cameras:` 的 key 推荐直接用 serial：
-  - 正例：`"DA8199285": { ... }`
-  - 反例：`cam0: { ... }`（除非你的输入里 camera_name 也叫 cam0）
+## 运行命令与验证标准
 
-2) `model` / `dll_dir` 这类字段允许空字符串
+### 在线：软件触发（推荐先跑这个）
 
-- `model: ""` 或 `dll_dir: ""` 会被 loader 当作 `None`。
+命令：
 
-3) `max_groups: 0` 表示不限
+- `uv run python -m tennis3d.apps.online_mvs_localize --config configs/online_pt_windows_cpu_software_trigger.yaml`
 
-- 离线与在线模板都遵循这个约定。
+验证标准：
 
-4) 可选 `curve` 段：输出“落点 + 落地时间 + 置信走廊”
+- 终端在检测到球时会打印包含 `xyz_w=(x=..., y=..., z=...)` 的行。
+- 若 `out_jsonl` 非空：对应的 jsonl 文件会持续追加记录，且每行包含 `balls` 字段。
 
-- 该段对应 `src/tennis3d/trajectory/curve_stage.py`，默认关闭。
-- 开启方式：在 config 里增加（或取消注释）
+### 在线：主从触发（Line0）
 
-```yaml
-curve:
-  enabled: true
-```
+命令：
 
-- 开启后，每条输出记录会新增 `curve` 字段：
-  - `curve.track_updates[*].v3.predicted_land_point`：落点（世界系）
-  - `curve.track_updates[*].v3.predicted_land_time_abs`：落地绝对时间（秒）
-  - `curve.track_updates[*].v3.corridor_on_planes_y`：按多条 y 平面的走廊统计（均值/协方差 + 过平面时间分布）
+- `uv run python -m tennis3d.apps.online_mvs_localize --config configs/online_master_slave_line0.yaml`
 
-验证标准（最小）：
-- 运行 offline/online 后，输出 jsonl 中能看到 `"curve": { ... }` 字段；且 `curve.t_source` 为 `capture_t_abs`（优先）或 `created_at`（回退）。
+验证标准：
+
+- 同上（能打印、能写 jsonl）。
+- 若你启用了 `time_sync_mode: dev_timestamp_mapping`：输出记录中会包含 `time_mapping_mapped_host_ms_*` 一类字段（用于离线统计时间映射质量）。
+
+### 离线：从 captures 输出 3D jsonl
+
+命令：
+
+- `uv run python -m tennis3d.apps.offline_localize_from_captures --config configs/offline_pt_windows_cpu.yaml`
+
+验证标准：
+
+- `out_jsonl` 指向的文件存在且非空。
+- 任意一行（JSON）中包含 `balls`，且当检测到球时 `balls` 非空。

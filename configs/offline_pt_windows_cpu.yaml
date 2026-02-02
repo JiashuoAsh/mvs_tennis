@@ -1,7 +1,7 @@
 ﻿# 离线 3D 定位配置（Windows/CPU，使用 Ultralytics YOLOv8 .pt）
 # 用法示例（任选其一）：
 # - uv run python -m tennis3d.apps.offline_localize_from_captures --config configs/offline_pt_windows_cpu.yaml
-# - tennis3d-offline --config examples/configs/offline_pt_windows_cpu.yaml
+# - tennis3d-offline --config configs/offline_pt_windows_cpu.yaml
 
 # captures 目录：要求包含 metadata.jsonl，且其中 frames.file 指向实际图片。
 captures_dir: data/captures_master_slave/tennis_test

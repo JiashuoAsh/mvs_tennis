@@ -275,7 +275,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--captures-dir",
-        default=str(repo_root / "data" / "captures_master_slave" / "tennis_test"),
+        default=str(repo_root / "data" / "captures_master_slave" / "tennis_offline"),
         help="captures directory containing metadata.jsonl",
     )
     p.add_argument(
@@ -283,7 +283,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="",
         help="Optional explicit image path (overrides --captures-dir auto pick)",
     )
-    p.add_argument("--conf", type=float, default=0.25, help="confidence threshold")
+    p.add_argument("--conf", type=float, default=0.005, help="confidence threshold")
     p.add_argument("--max-det", type=int, default=20, help="max detections")
 
     p.add_argument(

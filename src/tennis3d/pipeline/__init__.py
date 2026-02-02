@@ -8,10 +8,11 @@
 """
 
 from .core import run_localization_pipeline
-from .sources import iter_capture_image_groups, iter_mvs_image_groups
+from .sources import OnlineGroupWaitTimeout, iter_capture_image_groups, iter_mvs_image_groups
 
 __all__ = [
     "iter_capture_image_groups",
     "iter_mvs_image_groups",
+    "OnlineGroupWaitTimeout",
     "run_localization_pipeline",
 ]

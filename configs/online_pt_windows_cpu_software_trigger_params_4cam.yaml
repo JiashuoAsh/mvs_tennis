@@ -35,10 +35,12 @@ group_timeout_ms: 1000
 max_pending_groups: 256
 max_groups: 0
 
-# 触发配置（纯软件触发示例；如需主从触发请改用 online_master_slave_line1.yaml 的写法）
+# 触发配置（纯软件触发示例；如需主从触发请改用 configs/online_master_slave_line0.yaml 的写法）
 trigger:
   trigger_source: Software
   soft_trigger_fps: 5.0
+
+time_sync_mode: dev_timestamp_mapping
 
 # 输出路径（可选；不写则在线模式默认不落盘）
 out_jsonl: data/tools_output/online_positions_3d.params_4cam.jsonl

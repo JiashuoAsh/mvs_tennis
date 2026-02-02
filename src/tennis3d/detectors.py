@@ -100,6 +100,7 @@ def create_detector(
     name: str,
     model_path: Path | None = None,
     conf_thres: float = 0.25,
+    pt_device: str = "cpu",
 ) -> Detector:
     """创建检测器。
 
@@ -107,6 +108,7 @@ def create_detector(
         name: fake/color/rknn/pt。
         model_path: 模型路径（name=rknn 或 pt 时必填）。
         conf_thres: 最低置信度阈值。
+        pt_device: detector=pt 时的推理设备（例如 cpu/cuda:0/0）。
 
     Returns:
         Detector 实例。
@@ -151,7 +153,8 @@ def create_detector(
             raise ValueError("detector=pt requires --model")
         from tennis3d.offline_detect.pt_detector import UltralyticsPTDetector
 
-        return UltralyticsPTDetector(model_path=Path(model_path), conf_thres=float(conf_thres), device="cpu")
+        dev = str(pt_device or "cpu").strip() or "cpu"
+        return UltralyticsPTDetector(model_path=Path(model_path), conf_thres=float(conf_thres), device=dev)
 
     raise ValueError(f"unknown detector: {name} (expected: fake|color|rknn|pt)")
 

@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -23,6 +24,10 @@ from mvs.metadata_io import iter_metadata_records
 from mvs.pipeline import QuadCapture
 from mvs.image import frame_to_bgr
 from mvs.time_mapping import LinearTimeMapping, OnlineDevToHostMapper, load_time_mappings_json
+
+
+class OnlineGroupWaitTimeout(RuntimeError):
+    """在线采集在限定时间内未收到任何完整组包。"""
 
 
 def _median_int(values: list[int]) -> int | None:
@@ -81,6 +86,59 @@ def _host_timestamp_to_seconds(ts: Any) -> float | None:
         return float(v)
 
     return None
+
+
+def _host_timestamp_to_ms_epoch(ts: Any) -> float | None:
+    """把 host_timestamp（可能是 ms/ns/s）转换成 epoch 毫秒。
+
+    说明：
+        - 在线时间映射（dev_timestamp_mapping）拟合出来的结果单位约定为 epoch 毫秒。
+        - 为了评估“组内各相机时间差”，这里把每台相机的 host_timestamp 统一归一化到 ms。
+        - 该转换使用与 `_host_timestamp_to_seconds` 相同的数量级启发式。
+    """
+
+    try:
+        v = int(ts)
+    except Exception:
+        return None
+
+    if v <= 0:
+        return None
+
+    # ns epoch
+    if v >= 10**16:
+        return float(v) / 1e6
+    # ms epoch
+    if v >= 10**11:
+        return float(v)
+    # s epoch
+    if v >= 10**8:
+        return float(v) * 1000.0
+
+    return None
+
+
+def _spread_ms(values_ms: list[float]) -> float | None:
+    """返回一组时间戳（毫秒）的跨度：max - min。"""
+
+    if len(values_ms) < 2:
+        return None
+    lo = min(float(x) for x in values_ms)
+    hi = max(float(x) for x in values_ms)
+    return float(hi - lo)
+
+
+def _delta_to_median_by_camera(values_by_camera: dict[str, float]) -> dict[str, float] | None:
+    """把每相机时间戳转成“相对组内中位数”的偏差（毫秒）。"""
+
+    if len(values_by_camera) < 2:
+        return None
+
+    med = _median_float(list(values_by_camera.values()))
+    if med is None:
+        return None
+
+    return {str(k): float(v) - float(med) for k, v in values_by_camera.items()}
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -250,6 +308,7 @@ def iter_mvs_image_groups(
     binding: MvsBinding,
     max_groups: int = 0,
     timeout_s: float = 0.5,
+    max_wait_seconds: float = 0.0,
     time_sync_mode: str = "frame_host_timestamp",
     time_mapping_warmup_groups: int = 20,
     time_mapping_window_groups: int = 200,
@@ -270,6 +329,7 @@ def iter_mvs_image_groups(
     """
 
     group_index = 0
+    last_progress = time.monotonic()
 
     # 在线方案B：用滑窗持续拟合 dev_timestamp -> host_ms。
     mapper: OnlineDevToHostMapper | None = None
@@ -288,10 +348,18 @@ def iter_mvs_image_groups(
 
         group = cap.get_next_group(timeout_s=float(timeout_s))
         if group is None:
+            max_wait = float(max_wait_seconds)
+            if max_wait > 0 and (time.monotonic() - last_progress) > max_wait:
+                raise OnlineGroupWaitTimeout(
+                    f"在线采集等待超时：超过 {max_wait:.3f}s 未收到任何完整组包。"
+                )
             continue
+
+        last_progress = time.monotonic()
 
         images_by_camera: dict[str, np.ndarray] = {}
         host_ts_list: list[int] = []
+        host_ms_by_camera: dict[str, float] = {}
         serials_in_group: list[str] = []
         for fr in group:
             bgr = frame_to_bgr(binding=binding, cam=cap.cameras[fr.cam_index].cam, frame=fr)
@@ -303,6 +371,12 @@ def iter_mvs_image_groups(
             except Exception:
                 pass
 
+            # 说明：用于评估组内各相机“到达/时间戳”的离散程度。
+            # 这里把 host_timestamp 统一归一化到 ms_epoch。
+            hm = _host_timestamp_to_ms_epoch(getattr(fr, "host_timestamp", None))
+            if hm is not None:
+                host_ms_by_camera[serial] = float(hm)
+
             if mapper is not None:
                 # 关键点：每组每相机提供一个 (dev,host) 配对点。
                 mapper.observe_pair(serial=serial, dev_ts=int(fr.dev_timestamp), host_ms=int(fr.host_timestamp))
@@ -310,6 +384,9 @@ def iter_mvs_image_groups(
         host_ts_med = _median_int(host_ts_list)
         capture_t_abs = _host_timestamp_to_seconds(host_ts_med) if host_ts_med is not None else None
         capture_t_source: str | None = "frame_host_timestamp" if capture_t_abs is not None else None
+
+        # 说明：仅在 time_sync_mode=dev_timestamp_mapping 时会填充。
+        mapped_ms_by_camera: dict[str, float] = {}
 
         # 让映射器在“每个 group 结束”这个时刻决定是否重拟合一次。
         if mapper is not None:
@@ -321,9 +398,11 @@ def iter_mvs_image_groups(
                 if m is None:
                     continue
                 try:
-                    mapped_ms_list.append(float(m.map_dev_to_host_ms(int(fr.dev_timestamp))))
+                    ms = float(m.map_dev_to_host_ms(int(fr.dev_timestamp)))
                 except Exception:
                     continue
+                mapped_ms_list.append(ms)
+                mapped_ms_by_camera[str(fr.serial)] = float(ms)
             mapped_ms_med = _median_float(mapped_ms_list)
             if mapped_ms_med is not None:
                 capture_t_abs = float(mapped_ms_med) / 1000.0
@@ -337,6 +416,14 @@ def iter_mvs_image_groups(
             "time_sync_mode": str(time_sync_mode).strip() or None,
         }
 
+        # 说明：组内时间差评估（不依赖球是否被检测到）。
+        # - host_ms_*：基于原始 host_timestamp（归一化到 ms_epoch）的组内离散程度。
+        # - mapped_host_ms_*：基于时间映射后的 host_ms（ms_epoch）的组内离散程度。
+        if host_ms_by_camera:
+            meta["time_mapping_host_ms_by_camera"] = dict(host_ms_by_camera)
+            meta["time_mapping_host_ms_spread_ms"] = _spread_ms(list(host_ms_by_camera.values()))
+            meta["time_mapping_host_ms_delta_to_median_by_camera"] = _delta_to_median_by_camera(host_ms_by_camera)
+
         if mapper is not None:
             meta["time_mapping_groups_seen"] = int(mapper.groups_seen)
             meta["time_mapping_ready_count"] = int(mapper.ready_count(serials_in_group))
@@ -344,6 +431,14 @@ def iter_mvs_image_groups(
             worst_rms = mapper.worst_rms_ms(serials_in_group)
             meta["time_mapping_worst_p95_ms"] = float(worst_p95) if worst_p95 is not None else None
             meta["time_mapping_worst_rms_ms"] = float(worst_rms) if worst_rms is not None else None
+
+            # 注意：映射未就绪时，mapped_ms_by_camera 可能缺项。
+            if mapped_ms_by_camera:
+                meta["time_mapping_mapped_host_ms_by_camera"] = dict(mapped_ms_by_camera)
+                meta["time_mapping_mapped_host_ms_spread_ms"] = _spread_ms(list(mapped_ms_by_camera.values()))
+                meta["time_mapping_mapped_host_ms_delta_to_median_by_camera"] = _delta_to_median_by_camera(
+                    mapped_ms_by_camera
+                )
 
         yield meta, images_by_camera
         group_index += 1

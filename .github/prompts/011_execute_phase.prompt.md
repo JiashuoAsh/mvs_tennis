@@ -6,11 +6,11 @@ agent: "agent"
 ---
 
 本次执行的 Phase：${input:phase:填 1/2/3}
-本次处理范围 targets（逗号分隔，文件或目录）：${input:targets:例如 utils.py,libs/apriltag_perf,step4_multi_extrinsic_pose_graph.py}
+本次处理范围 targets（逗号分隔，文件或目录）：${input:targets:例如 utils.py,libs/apriltag_perf,mcca/entry/step4_multi_extrinsic.py}
 本次目标（一句话）：${input:goal:例如“修正依赖方向并建立最小库/入口边界”}
 
 原则：允许一次性处理多个文件/目录，但必须“批量且有边界”，不能变成全仓库随意大改。
-硬约束：不新增第三方依赖；不做过度设计；保持既有行为不变（除非明确说明）；中文注释/log/docstring。
+硬约束：避免不必要的新增第三方依赖（确需新增时允许：必须说明必要性/替代方案/影响面，并同步更新依赖声明如 pyproject.toml/锁文件与最小验证）；不做过度设计；保持既有行为不变（除非明确说明）；中文注释/log/docstring。
 
 按固定流程输出并执行（不要跳步）：
 

@@ -1,6 +1,13 @@
 # config YAML 模板（tennis3d online/offline）
 
-这里的文件是“模板”：字段名与 `src/tennis3d/config.py` 的 loader 保持一致，适合直接复制一份再改成你的参数。
+这里的文件是“模板”：字段名与 `src/tennis3d/config.py` 的 loader 保持一致。
+
+约定：
+
+- **有默认值的字段**：尽量写出默认值（便于你理解默认行为）
+- **必填但没有默认值的字段**：使用占位符（例如 `<PATH_TO_CALIB_JSON_OR_YAML>`、`<CAM1_SERIAL>`），需要你手动替换
+
+建议用法：从这里复制一份到 `configs/`，再改成你的真实参数。
 
 ## 快速用法
 
@@ -14,17 +21,20 @@
 ### 离线（offline）
 
 - `offline_color_minimal.yaml`
-  - 最小可用模板：不依赖模型文件，适合先验证“读 captures -> 分组 -> 三角化 -> 输出”的链路。
-- `offline_fake_smoke.yaml`
-  - 冒烟模板：更偏“程序能否跑通”的连通性测试。
+  - 颜色检测模板：不依赖模型文件，适合先验证“读 captures -> 分组 -> 三角化 -> 输出”的链路。
 - `offline_pt_ultralytics.yaml`
   - `.pt` 模型模板：Windows/CPU 上常用（Ultralytics YOLOv8）。
+- `offline_rknn_board_or_linux.yaml`
+  - RKNN 模板：通常用于 Rockchip 或 Linux 工具链（Windows 上一般不可用）。
+
+- `offline_fake_smoke.yaml`（可选）
+  - 冒烟/连通性模板：使用 fake 检测器，主要用于验证程序链路是否可跑通。
 
 ### 在线（online）
 
 - `online_software_trigger_minimal.yaml`
-  - 最小可用模板：纯软件触发（所有相机 Software，按 `soft_trigger_fps` 发软触发）。
-- `online_master_slave_line1_template.yaml`
+  - 软件触发模板：所有相机 Software，按 `soft_trigger_fps` 发软触发。
+- `online_master_slave_template.yaml`
   - 主从触发拓扑模板：只对 master 发软触发，master 通过 LineOut 触发 slave。
 
 ### 标定（calibration）
@@ -57,3 +67,8 @@
 - `max_reproj_error_px`：最大重投影误差阈值（像素），越小越严格
 - `max_uv_match_dist_px`：投影补全匹配阈值（像素）
 - `merge_dist_m`：3D 去重阈值（米）
+
+验证标准（最小）：
+
+- 运行 offline/online 后，输出 jsonl 中能看到 `balls` 字段；当检测到球时 `balls` 非空。
+

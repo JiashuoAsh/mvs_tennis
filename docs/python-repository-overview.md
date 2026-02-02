@@ -581,10 +581,11 @@ python -m mvs.apps.quad_capture \
 
 ### 3D 定位（tennis3d）
 
-配置模板位于 `configs/` 与 `examples/configs/`，其中：
+配置文件与示例位于：
 
-- `configs/offline_*.yaml`：离线从 captures 跑定位
-- `configs/online_*.yaml`：在线边采集边定位
+- `configs/`：项目内更偏“可直接运行/更贴近真实部署”的配置（常绑定你的真实标定与 serial）。
+- `examples/configs/`：仅保留模板目录（不再放可运行示例配置）。
+- `examples/configs/templates/`：模板（有占位符，需要你填 serial/标定/路径等）。
 
 #### 离线：从 captures/metadata.jsonl 输出多球 3D（JSONL）
 

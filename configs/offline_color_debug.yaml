@@ -1,6 +1,6 @@
 ﻿# 离线 3D 定位配置（纯 OpenCV 颜色阈值检测，适合调试链路）
 # 用法示例：
-# - uv run python -m tennis3d.apps.offline_localize_from_captures --config examples/configs/offline_color_debug.yaml
+# - uv run python -m tennis3d.apps.offline_localize_from_captures --config configs/offline_color_debug.yaml
 
 captures_dir: data/captures/sample_sequence
 calib: data/calibration/sample_cams.yaml

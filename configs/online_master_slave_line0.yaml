@@ -1,0 +1,138 @@
+﻿# 在线采集 + 3D 定位配置（主从触发示例：master=Software，slaves=Line0）
+# 适用：你已经在硬件上把 master 的 LineOut（例如 Line1）接到了 slaves 的 LineIn（例如 Line0）。
+#
+# 说明：该 online 配置主要用于“在线定位与输出 JSONL”。
+# - ROI/像素格式等相机参数可以在本 YAML 中配置（见下方 pixel_format/image_*）。
+# - 如果你要做“采集并保存图片用于标定”（例如 save-mode=sdk-bmp/raw），请使用 mvs.apps.quad_capture。
+#
+# 用法示例：
+# - uv run python -m tennis3d.apps.online_mvs_localize --config configs/online_master_slave_line0.yaml
+
+# MVS Python 示例绑定目录（MvImport，可选）：
+# - 推荐设置环境变量：MVS_MVIMPORT_DIR=<.../MvImport>
+# - 或在此处填写目录路径（包含 MvCameraControl_class.py 等文件）
+mvimport_dir: ""
+
+# MVS SDK 动态库目录（可选）：
+# - 推荐设置环境变量：MVS_DLL_DIR=<...>
+# - 或在此处填写目录路径（包含 MvCameraControl.dll）
+dll_dir: ""
+
+serials:
+  - DA8199303
+  - DA8199402
+  - DA8199243
+  - DA8199285
+
+calib: data/calibration/camera_extrinsics_C_T_B.json
+
+# 可选：相机图像参数（会传给 SDK）。
+# - pixel_format 为空表示不设置（沿用相机当前配置）。
+# - image_width/image_height 必须同时设置；不设置就删掉/留空。
+pixel_format: BayerRG8
+# image_width: 2448
+# image_height: 2048
+# image_offset_x: 0
+# image_offset_y: 0
+
+image_width: 1980
+image_height: 1080
+image_offset_x: 200
+image_offset_y: 800
+
+# 这里演示 detector=pt（Windows 友好）；你也可以改为 fake/color 做链路验证。
+detector: pt
+model: data/models/best.pt
+
+# detector=pt 时可选：Ultralytics 推理设备。
+# - 默认 cpu（不写该字段时）。
+# - NVIDIA GPU + CUDA 版 torch 环境下，可写 cuda:0（或 0 / cuda）。
+pt_device: cuda:0
+
+min_score: 0.01
+require_views: 2
+
+# 多球鲁棒定位参数：
+# max_detections_per_camera: 10
+# max_reproj_error_px: 8.0
+# max_uv_match_dist_px: 25.0
+# merge_dist_m: 0.08
+max_detections_per_camera: 10
+max_reproj_error_px: 10.0
+max_uv_match_dist_px: 10.0
+merge_dist_m: 0.08
+
+# group_by 建议 frame_num
+# 主从触发时相机帧号通常更稳定。
+group_by: frame_num
+
+timeout_ms: 1000
+group_timeout_ms: 1000
+max_pending_groups: 256
+max_groups: 0
+
+# 可选：超过这么久仍拿不到“完整组包”则退出（0 表示不限）。
+# 主从硬触发线路未接好时，用它避免程序一直挂着。
+max_wait_seconds: 10
+
+# 终端输出模式：
+# - best：只打印每组 top-1 球（更安静，默认）
+# - all：打印该组所有球（便于 debug 多球/误检）
+terminal_status_interval_s: 3.0
+terminal_print_mode: all
+out_jsonl_only_when_balls: true
+out_jsonl_flush_every_records: 20
+out_jsonl_flush_interval_s: 0.5
+
+time_sync_mode: dev_timestamp_mapping
+# 以下为在线滑窗映射参数（均为默认值）。仅在 time_sync_mode=dev_timestamp_mapping 时会用到。
+time_mapping_warmup_groups: 20
+time_mapping_window_groups: 200
+time_mapping_update_every_groups: 5
+time_mapping_min_points: 20
+time_mapping_hard_outlier_ms: 50.0
+
+trigger:
+  # slave 触发源：这里使用 Line0（与 mvs.apps.quad_capture 示例命令一致）
+  trigger_source: Line0
+
+  # master 必须在 serials 列表中
+  master_serial: "DA8199303"
+
+  # 主从触发模式下只对 master 下发软触发
+  soft_trigger_fps: 30.0
+
+  # master-slave 硬件连接设置：
+  master_line_out: Line1
+  master_line_source: ExposureStartActive
+  master_line_mode: Output
+  trigger_activation: RisingEdge
+  trigger_cache_enable: true
+
+# 可选：轨迹拟合后处理（curve v3）。默认 disabled。
+curve:
+  enabled: true
+  y_offset_m: 0.13
+  y_negate: true
+  # 主输出算法：v3（默认）| v2（curve2 legacy）| v3_legacy（v3 的 legacy 适配层）
+  primary: v2
+  compare_v2: false
+  compare_v3_legacy: false
+  max_tracks: 4
+  # association_dist_m: 0.6
+  # max_missed_s: 0.6
+  association_dist_m: 3.0
+  max_missed_s: 3.0
+  min_dt_s: 0.000001
+  # corridor_y_min: 0.6
+  # corridor_y_max: 1.2
+  corridor_y_min: 0.7
+  corridor_y_max: 0.8
+  corridor_y_step: 0.1
+  conf_from: quality
+  constant_conf: 1.0
+  is_bot_fire: -1
+
+# 输出路径（可选；不写则在线模式默认不落盘）
+out_jsonl: data/tools_output/online_positions_3d.master_slave.jsonl
+

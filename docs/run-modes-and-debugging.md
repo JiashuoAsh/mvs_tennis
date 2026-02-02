@@ -102,6 +102,53 @@ python -m tennis3d.apps.online_mvs_localize \
   --require-views 2
 ```
 
+```bash
+python -m tennis3d.apps.online_mvs_localize \
+  --config configs/online_pt_windows_cpu_software_trigger_params_4cam.yaml
+```
+
+预期输出（最小）：
+
+- 启动后会先提示 `Waiting for first ball observation...`
+- 当观测到球（跨视角几何一致，`balls` 非空）时，会在终端持续打印类似：
+  - `t=<capture_t_abs> group=<group_index> xyz_w=(x=..., y=..., z=...) err_mean=...px ...`
+  - 其中 `xyz_w` 即 `balls[0].ball_3d_world`（世界坐标系 3D）
+
+### D) 如何确定“时间映射后各相机时间差是多少”
+
+前置条件：
+- 使用 `--time-sync-mode dev_timestamp_mapping`（或在 config 中设置 `time_sync_mode: dev_timestamp_mapping`）
+- 建议同时开启 `--out-jsonl`（便于离线统计）
+
+在线 source（`src/tennis3d/pipeline/sources.py::iter_mvs_image_groups`）会在每条输出记录中透传以下字段（均为毫秒 ms）：
+
+- `time_mapping_mapped_host_ms_by_camera`：映射后的每相机 host 时间戳（ms_epoch）
+- `time_mapping_mapped_host_ms_spread_ms`：同一 group 内各相机时间戳跨度（max-min）
+- `time_mapping_mapped_host_ms_delta_to_median_by_camera`：每相机相对组内“中位数”的偏差（正=更晚，负=更早）
+
+对照用（不经映射、直接看 host_timestamp 的离散程度）：
+
+- `time_mapping_host_ms_by_camera`
+- `time_mapping_host_ms_spread_ms`
+- `time_mapping_host_ms_delta_to_median_by_camera`
+
+终端打印：当上述字段存在时，online 的“有球时输出”会追加：
+
+- `dt_raw=<...>ms`：原始 host_timestamp 组内跨度
+- `dt_map=<...>ms`：映射后组内跨度
+- `dt_map_by_cam={<serial:+/-...>}`：每相机相对组内中位数的偏差
+
+离线汇总（推荐看分布，而不是只看某一帧）：
+
+```bash
+python tools/time_mapping_report.py --jsonl <你的输出.jsonl>
+```
+
+预期输出/验证标准（最小）：
+
+- 能看到“映射后组内跨度（ms）”的 p50/p95/max
+- 能看到每台相机“相对组内中位数偏差（ms）”的 median 与 abs_p95
+
 ### C) 可选：轨迹拟合（落点 + 落地时间 + 置信走廊）
 
 前置条件：
