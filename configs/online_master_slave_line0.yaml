@@ -49,6 +49,14 @@ model: data/models/best.pt
 # - NVIDIA GPU + CUDA 版 torch 环境下，可写 cuda:0（或 0 / cuda）。
 pt_device: cuda:0
 
+# 软件裁剪（动态 ROI，可选）：在 detector 前裁剪小窗口以提高吞吐。
+# 重要：裁剪坐标系下的 bbox 会自动加回 offset，保证下游仍是“原图像素坐标系”（这里的“原图”指相机输出的 ROI 图像）。
+# 建议：先用较大/稳定的相机 ROI 把球路径覆盖住，再开启软件裁剪做“跟踪式小窗推理”。
+# detector_crop_size: 640
+# detector_crop_smooth_alpha: 0.2
+# detector_crop_max_step_px: 120
+# detector_crop_reset_after_missed: 8
+
 min_score: 0.01
 require_views: 2
 
@@ -132,6 +140,33 @@ curve:
   conf_from: quality
   constant_conf: 1.0
   is_bot_fire: -1
+
+  # 观测过滤（默认关闭；需要上游定位输出包含对应诊断字段）
+  obs_min_views: 0
+  obs_min_quality: 0.0
+  obs_max_median_reproj_error_px: null
+  obs_max_ball_3d_std_m: null
+
+  # 轨迹片段（episode）判定（默认关闭）
+  # 起始判定固定为：z 方向门控 + y 轴重力一致性（ay≈g）。
+  episode_enabled: false
+  episode_buffer_s: 0.6
+  episode_min_obs: 5
+  episode_z_dir: 0
+  episode_min_abs_dz_m: 0.25
+  episode_min_abs_vz_mps: 1.0
+  episode_gravity_mps2: 9.8
+  episode_gravity_tol_mps2: 3.0
+
+  # 结束判定
+  episode_stationary_speed_mps: 0.25
+  episode_end_if_stationary_s: 0.35
+  episode_end_after_predicted_land_s: 0.2
+
+  # episode 行为
+  reset_predictor_on_episode_start: true
+  reset_predictor_on_episode_end: true
+  feed_curve_only_when_episode_active: false
 
 # 输出路径（可选；不写则在线模式默认不落盘）
 out_jsonl: data/tools_output/online_positions_3d.master_slave.jsonl

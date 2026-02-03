@@ -21,7 +21,7 @@ argument-hint: "（可选）focus=某个目录，如 focus=src/"
    - 每项必须包含：路径、症状、为什么优先、建议处理方式（拆分/搬家/包化/只加边界）。
 
 4) 分阶段计划（phase plan）
-   - Phase 1：最小骨架（库 vs 入口 vs scripts 的边界，建议目录）
+   - Phase 1：基础骨架（库 vs 入口 vs scripts 的边界，建议目录）
    - Phase 2：逐个热点拆解（一次一个）
    - Phase 3：收尾（统一 import 路径、public API、包化、文档/自检）
 

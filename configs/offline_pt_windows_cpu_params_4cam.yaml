@@ -58,6 +58,7 @@ max_groups: 0
 
 curve:
   enabled: true
+  primary: v3
   compare_v2: false
   compare_v3_legacy: false
   max_tracks: 4
@@ -71,7 +72,36 @@ curve:
   corridor_y_step: 0.1
   conf_from: quality
   constant_conf: 1.0
+  y_offset_m: 0.0
+  y_negate: false
   is_bot_fire: -1
+
+  # 观测过滤（默认关闭；需要上游定位输出包含对应诊断字段）
+  obs_min_views: 0
+  obs_min_quality: 0.0
+  obs_max_median_reproj_error_px: null
+  obs_max_ball_3d_std_m: null
+
+  # 轨迹片段（episode）判定（默认关闭）
+  # 起始判定固定为：z 方向门控 + y 轴重力一致性（ay≈g）。
+  episode_enabled: false
+  episode_buffer_s: 0.6
+  episode_min_obs: 5
+  episode_z_dir: 0
+  episode_min_abs_dz_m: 0.25
+  episode_min_abs_vz_mps: 1.0
+  episode_gravity_mps2: 9.8
+  episode_gravity_tol_mps2: 3.0
+
+  # 结束判定
+  episode_stationary_speed_mps: 0.25
+  episode_end_if_stationary_s: 0.35
+  episode_end_after_predicted_land_s: 0.2
+
+  # episode 行为
+  reset_predictor_on_episode_start: true
+  reset_predictor_on_episode_end: true
+  feed_curve_only_when_episode_active: false
 
 # 输出 JSONL 路径（每行一个结果记录）
 out_jsonl: data/tools_output/offline_positions_3d.params_4cam.jsonl

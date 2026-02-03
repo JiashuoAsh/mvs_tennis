@@ -19,6 +19,12 @@ calib: data/calibration/params_4cam_calib.json
 
 detector: pt
 model: data/models/best.pt
+
+# 软件裁剪（动态 ROI，可选）：在 detector 前裁剪小窗口以提高吞吐。
+# detector_crop_size: 640
+# detector_crop_smooth_alpha: 0.2
+# detector_crop_max_step_px: 120
+# detector_crop_reset_after_missed: 8
 min_score: 0.25
 require_views: 2
 max_detections_per_camera: 10

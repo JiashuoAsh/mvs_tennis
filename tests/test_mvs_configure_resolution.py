@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, cast
 
 import pytest
 
@@ -55,7 +56,7 @@ class _FakeCam:
     def _height_max(self) -> int:
         return int(self.sensor_h - self.offset_y)
 
-    def MV_CC_GetIntValue(self, key: str, st: object) -> int:
+    def MV_CC_GetIntValue(self, key: str, st: Any) -> int:
         # 这里按 MVS 的字段名约定填充。
         if key == "Width":
             st.nCurValue = int(self.width)
@@ -130,7 +131,7 @@ def test_configure_resolution_clears_offset_before_reading_range() -> None:
 
     # 请求全分辨率 + offset 归零
     configure_resolution(
-        binding=binding,
+        binding=cast(Any, binding),
         cam=cam,
         width=2448,
         height=2048,
@@ -149,4 +150,81 @@ def test_configure_resolution_rejects_non_positive_size() -> None:
     cam = _FakeCam()
 
     with pytest.raises(ValueError):
-        configure_resolution(binding=binding, cam=cam, width=0, height=2048)
+        configure_resolution(binding=binding, cam=cam, width=0, height=2048)  # type: ignore[arg-type]
+
+
+class _FixedAoiReadOnlySizeCam:
+    """模拟“固定 AOI”机型：Width/Height 不可写，但 OffsetX/OffsetY 可写。"""
+
+    def __init__(self) -> None:
+        self.sensor_w = 2448
+        self.sensor_h = 2048
+
+        # 固定 AOI 尺寸（不可改）
+        self.width = 1280
+        self.height = 1080
+
+        self.offset_x = 0
+        self.offset_y = 0
+
+        self._inc = 4
+
+    def MV_CC_GetIntValue(self, key: str, st: Any) -> int:
+        if key == "Width":
+            st.nCurValue = int(self.width)
+            st.nMin = int(self.width)
+            st.nMax = int(self.width)
+            st.nInc = int(self._inc)
+            return 0
+        if key == "Height":
+            st.nCurValue = int(self.height)
+            st.nMin = int(self.height)
+            st.nMax = int(self.height)
+            st.nInc = int(self._inc)
+            return 0
+        if key == "OffsetX":
+            st.nCurValue = int(self.offset_x)
+            st.nMin = 0
+            st.nMax = int(self.sensor_w - self.width)
+            st.nInc = int(self._inc)
+            return 0
+        if key == "OffsetY":
+            st.nCurValue = int(self.offset_y)
+            st.nMin = 0
+            st.nMax = int(self.sensor_h - self.height)
+            st.nInc = int(self._inc)
+            return 0
+        return 1
+
+    def MV_CC_SetIntValue(self, key: str, value: int) -> int:
+        v = int(value)
+        if key in ("Width", "Height"):
+            # 模拟：节点不可写（但值保持不变）
+            return 1
+        if key == "OffsetX":
+            self.offset_x = v
+            return 0
+        if key == "OffsetY":
+            self.offset_y = v
+            return 0
+        return 1
+
+
+def test_configure_resolution_accepts_readonly_width_height_if_already_target() -> None:
+    binding = _FakeBinding()
+    cam = _FixedAoiReadOnlySizeCam()
+
+    # 固定 AOI：宽高不可改，但我们仍希望能设置 offset。
+    configure_resolution(
+        binding=cast(Any, binding),
+        cam=cam,
+        width=1280,
+        height=1080,
+        offset_x=584,
+        offset_y=484,
+    )
+
+    assert cam.width == 1280
+    assert cam.height == 1080
+    assert cam.offset_x == 584
+    assert cam.offset_y == 484

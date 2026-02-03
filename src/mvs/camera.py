@@ -140,17 +140,38 @@ def configure_resolution(
     if w_info is None or h_info is None:
         raise MvsError("无法读取 Width/Height 节点信息：该机型可能不支持 ROI，或当前节点不可读。")
 
-    _, w_min, w_max, w_inc = w_info
-    _, h_min, h_max, h_inc = h_info
+    w_cur, w_min, w_max, w_inc = w_info
+    h_cur, h_min, h_max, h_inc = h_info
 
     target_w = _align_down(int(width), vmin=w_min, vmax=w_max, inc=w_inc)
     target_h = _align_down(int(height), vmin=h_min, vmax=h_max, inc=h_inc)
 
-    ret = cam.MV_CC_SetIntValue("Width", int(target_w))
-    _check(ret, binding.MV_OK, f"SetIntValue(Width={target_w})")
+    def _set_or_accept_readonly_if_already(key: str, *, target: int, cur_before: int) -> None:
+        """设置 int 节点；若节点不可写但值已是目标值，则允许继续。
 
-    ret = cam.MV_CC_SetIntValue("Height", int(target_h))
-    _check(ret, binding.MV_OK, f"SetIntValue(Height={target_h})")
+        背景：
+            部分机型在固定 AOI（不可改 Width/Height，只能改 OffsetX/OffsetY）时，
+            对 Width/Height 写入会返回失败码，但读取到的 cur 值已满足目标。
+            在这种情况下，继续执行后续 Offset 设置比直接报错更符合工程预期。
+
+        约束：
+            仅当 *写前* 与 *写后* 的 cur 都等于 target 时才吞掉错误，避免掩盖真实配置失败。
+        """
+
+        ret = int(cam.MV_CC_SetIntValue(str(key), int(target)))
+        if int(ret) == int(binding.MV_OK):
+            return
+
+        after = _get_int_node_info(binding=binding, cam=cam, key=str(key))
+        cur_after = int(after[0]) if after is not None else None
+
+        if int(cur_before) == int(target) and (cur_after is not None) and int(cur_after) == int(target):
+            return
+
+        _check(ret, binding.MV_OK, f"SetIntValue({key}={target})")
+
+    _set_or_accept_readonly_if_already("Width", target=int(target_w), cur_before=int(w_cur))
+    _set_or_accept_readonly_if_already("Height", target=int(target_h), cur_before=int(h_cur))
 
     # 最后再设置用户请求的偏移（如果节点存在）。偏移同样可能有步进限制。
     ox_info = _get_int_node_info(binding=binding, cam=cam, key="OffsetX")

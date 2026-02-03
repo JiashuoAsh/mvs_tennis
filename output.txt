@@ -1,9 +1,30 @@
-summary keys: ['by_post_n', 'curve2_residual', 'hit_pred_vs_obs_est_post', 'notes', 'target_y']
-by_post_n keys: ['all', '0', '3', '5', '7', '9', '11']
-all up {'dxz_cm': 4.10716614732467, 'dt_ms': 12.125253677368164} down {'dxz_cm': 6.977903993639421, 'dt_ms': 22.560596466064453}
-0 up None down None
-3 up {'dxz_cm': 12.325764171904655, 'dt_ms': -37.933349609375} down {'dxz_cm': 40.583865463218196, 'dt_ms': 127.57706642150879}
-5 up {'dxz_cm': 7.58387281925805, 'dt_ms': -24.796247482299805} down {'dxz_cm': 32.24889341796357, 'dt_ms': 99.10106658935547}
-7 up {'dxz_cm': 4.170951045810888, 'dt_ms': -13.822555541992188} down {'dxz_cm': 25.205815064582666, 'dt_ms': 77.08287239074707}
-9 up {'dxz_cm': 0.9671531137181756, 'dt_ms': -3.9458274841308594} down {'dxz_cm': 17.058675555880836, 'dt_ms': 50.072431564331055}
-11 up {'dxz_cm': 1.2064029032919164, 'dt_ms': 3.2358169555664062} down {'dxz_cm': 12.426260110577392, 'dt_ms': 37.461280822753906}
+============================= test session starts =============================
+platform win32 -- Python 3.13.9, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\woan\Desktop\MVS_Deployment
+configfile: pyproject.toml
+testpaths: tests
+collected 53 items
+
+tests\test_calibration_fuse_params_json.py .                             [  1%]
+tests\test_calibration_roi.py .                                          [  3%]
+tests\test_calibration_yaml.py .                                         [  5%]
+tests\test_capture_relayout.py .                                         [  7%]
+tests\test_capture_session.py ......                                     [ 18%]
+tests\test_curve_stage_episode.py ...                                    [ 24%]
+tests\test_curve_stage_smoke.py .....                                    [ 33%]
+tests\test_curve_v2_smoke.py ..                                          [ 37%]
+tests\test_detector_pt.py ...                                            [ 43%]
+tests\test_localize_balls.py ...                                         [ 49%]
+tests\test_mvs_configure_resolution.py ..                                [ 52%]
+tests\test_offline_pt_device_controls.py ..                              [ 56%]
+tests\test_offline_serials_filter.py ...                                 [ 62%]
+tests\test_online_output_controls.py ..                                  [ 66%]
+tests\test_online_terminal_output.py ......                              [ 77%]
+tests\test_pipeline_detector_crop.py .                                   [ 79%]
+tests\test_pipeline_output_covariance.py .                               [ 81%]
+tests\test_tennis_geometry.py ...                                        [ 86%]
+tests\test_time_mapping.py .                                             [ 88%]
+tests\test_time_mapping_group_metrics.py .....                           [ 98%]
+tests\test_time_mapping_online.py .                                      [100%]
+
+============================= 53 passed in 10.36s =============================

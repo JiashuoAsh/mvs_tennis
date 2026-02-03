@@ -14,6 +14,101 @@ import numpy as np
 from tennis3d.models import Detection
 
 
+def crop_bgr(
+    img_bgr: np.ndarray,
+    *,
+    crop_width: int,
+    crop_height: int,
+    offset_x: int,
+    offset_y: int,
+) -> tuple[np.ndarray, tuple[int, int]]:
+    """从 BGR 图像中裁出一个子窗口。
+
+    说明：
+        - 该裁剪是“软件裁剪”：不改变相机侧 ROI 设置，不需要逐帧改标定。
+        - 返回的 offset 用于把 crop 坐标系下的检测框回写到原图坐标系。
+        - offset_x/offset_y 会被自动 clamp，保证裁剪窗口始终落在图像内。
+
+    Args:
+        img_bgr: 输入图像。
+        crop_width: 裁剪宽度（像素）。
+        crop_height: 裁剪高度（像素）。
+        offset_x: 希望裁剪窗口左上角在原图中的 x。
+        offset_y: 希望裁剪窗口左上角在原图中的 y。
+
+    Returns:
+        (cropped, (offset_x_clamped, offset_y_clamped))
+    """
+
+    if img_bgr is None or img_bgr.size == 0:
+        return img_bgr, (0, 0)
+
+    h, w = int(img_bgr.shape[0]), int(img_bgr.shape[1])
+    cw = int(max(1, min(int(crop_width), w)))
+    ch = int(max(1, min(int(crop_height), h)))
+
+    ox = int(offset_x)
+    oy = int(offset_y)
+
+    # clamp 到合法范围，避免 slice 越界。
+    ox = int(max(0, min(ox, w - cw)))
+    oy = int(max(0, min(oy, h - ch)))
+
+    cropped = img_bgr[oy : oy + ch, ox : ox + cw]
+
+    # 说明：很多推理后端更喜欢连续内存（C contiguous）。
+    # 这里主动 copy，代价可控（裁剪本来就用于降开销）。
+    return np.ascontiguousarray(cropped), (ox, oy)
+
+
+def shift_detections(
+    dets: list[Detection],
+    *,
+    dx: int,
+    dy: int,
+    clip_shape: tuple[int, int] | None = None,
+) -> list[Detection]:
+    """把检测框从子窗口坐标系回写到原图坐标系。
+
+    Args:
+        dets: 子窗口坐标系下的检测框。
+        dx: 子窗口左上角在原图坐标系下的 x（offset_x）。
+        dy: 子窗口左上角在原图坐标系下的 y（offset_y）。
+        clip_shape: 若提供 (H, W)，则把 bbox clip 到 [0,W-1]x[0,H-1]。
+
+    Returns:
+        回写后的 Detection 列表（新对象，保持 frozen dataclass 语义）。
+    """
+
+    if not dets:
+        return []
+
+    dx_f = float(int(dx))
+    dy_f = float(int(dy))
+
+    h = w = None
+    if clip_shape is not None:
+        h = int(clip_shape[0])
+        w = int(clip_shape[1])
+
+    out: list[Detection] = []
+    for d in dets:
+        x1, y1, x2, y2 = d.bbox
+        x1 = float(x1) + dx_f
+        y1 = float(y1) + dy_f
+        x2 = float(x2) + dx_f
+        y2 = float(y2) + dy_f
+
+        if h is not None and w is not None and h > 0 and w > 0:
+            x1 = float(np.clip(x1, 0.0, float(w - 1)))
+            x2 = float(np.clip(x2, 0.0, float(w - 1)))
+            y1 = float(np.clip(y1, 0.0, float(h - 1)))
+            y2 = float(np.clip(y2, 0.0, float(h - 1)))
+
+        out.append(Detection(bbox=(x1, y1, x2, y2), score=float(d.score), cls=int(d.cls)))
+    return out
+
+
 def letterbox(
     img: np.ndarray,
     new_shape: tuple[int, int] = (640, 640),

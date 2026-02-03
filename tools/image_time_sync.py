@@ -493,6 +493,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--folders",
         nargs="+",
         default=[
+            "MV-CS050-04(DA8199243)",
             "MV-CS050-02(DA8199285)",
             "MV-CS050-03(DA8199303)",
             "MV-CS050-CTRL(DA8199402)",
@@ -501,7 +502,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--reference",
-        default="MV-CS050-CTRL(DA8199402)",
+        default="MV-CS050-03(DA8199303)",
         help="参考相机文件夹名称（必须在 --folders 中）",
     )
     p.add_argument(

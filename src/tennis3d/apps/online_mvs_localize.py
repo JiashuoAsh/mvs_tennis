@@ -17,12 +17,20 @@ from typing import Any, Literal, Optional, Sequence, cast
 
 from mvs import MvsDllNotFoundError, load_mvs_binding
 from mvs.pipeline import open_quad_capture
+from mvs.runtime_roi import get_int_node_info, try_set_int_node
 
 from tennis3d.config import load_online_app_config
 from tennis3d.detectors import create_detector
 from tennis3d.geometry.calibration import apply_sensor_roi_to_calibration, load_calibration
 from tennis3d.online.triggering import build_trigger_plan
 from tennis3d.pipeline import OnlineGroupWaitTimeout, iter_mvs_image_groups, run_localization_pipeline
+from tennis3d.pipeline.roi import KinematicRoiConfig, KinematicRoiController
+from tennis3d.pipeline.two_stage_roi import (
+    CameraAoiRuntimeConfig,
+    CameraAoiState,
+    SoftwareCropConfig,
+    TwoStageKinematicRoiController,
+)
 from tennis3d.trajectory import CurveStageConfig, apply_curve_stage
 
 
@@ -467,6 +475,76 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=0.08,
         help="3D merge distance in meters for deduplicating ball candidates",
     )
+
+    # 软件裁剪（动态 ROI）：在 detector 前裁剪小窗口，提高吞吐/精度；bbox 会自动回写到原图坐标系。
+    p.add_argument(
+        "--detector-crop-size",
+        type=int,
+        default=0,
+        help=(
+            "optional software crop size (square). 0 disables. "
+            "Typical: 640 (run detector on 640x640 window)"
+        ),
+    )
+    p.add_argument(
+        "--detector-crop-smooth-alpha",
+        type=float,
+        default=0.2,
+        help="crop smoothing alpha in [0,1]. Larger = more stable",
+    )
+    p.add_argument(
+        "--detector-crop-max-step-px",
+        type=int,
+        default=120,
+        help="max crop movement per group in pixels (0 = no limit)",
+    )
+    p.add_argument(
+        "--detector-crop-reset-after-missed",
+        type=int,
+        default=8,
+        help="reset crop prediction after N consecutive groups with no balls",
+    )
+
+    # 相机侧 AOI（运行中动态平移 OffsetX/OffsetY）。
+    # 说明：
+    # - 需要机型支持运行中写 Offset；不支持时会写入失败（返回码 != MV_OK），但主流程仍可继续。
+    # - 启用后不要再对 calib 做 apply_sensor_roi_to_calibration 的一次性主点平移；
+    #   而是通过 ROI 控制器逐帧返回 total_offset，把 bbox/uv 回写到满幅坐标系。
+    p.add_argument(
+        "--camera-aoi-runtime",
+        action="store_true",
+        help="enable runtime camera AOI panning (OffsetX/OffsetY)",
+    )
+    p.add_argument(
+        "--camera-aoi-update-every-groups",
+        type=int,
+        default=2,
+        help="update camera offsets every N groups (>=1)",
+    )
+    p.add_argument(
+        "--camera-aoi-min-move-px",
+        type=int,
+        default=8,
+        help="skip AOI update if movement < this pixels",
+    )
+    p.add_argument(
+        "--camera-aoi-smooth-alpha",
+        type=float,
+        default=0.3,
+        help="camera AOI smoothing alpha in [0,1]",
+    )
+    p.add_argument(
+        "--camera-aoi-max-step-px",
+        type=int,
+        default=160,
+        help="max AOI movement per update in pixels (0 = no limit)",
+    )
+    p.add_argument(
+        "--camera-aoi-recenter-after-missed",
+        type=int,
+        default=30,
+        help="after N missed groups, slowly recenter AOI to initial offset (0 disables)",
+    )
     p.add_argument(
         "--out-jsonl",
         default="",
@@ -596,6 +674,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         time_mapping_update_every_groups = int(cfg.time_mapping_update_every_groups)
         time_mapping_min_points = int(cfg.time_mapping_min_points)
         time_mapping_hard_outlier_ms = float(cfg.time_mapping_hard_outlier_ms)
+
+        detector_crop_size = int(getattr(cfg, "detector_crop_size", 0))
+        detector_crop_smooth_alpha = float(getattr(cfg, "detector_crop_smooth_alpha", 0.2))
+        detector_crop_max_step_px = int(getattr(cfg, "detector_crop_max_step_px", 120))
+        detector_crop_reset_after_missed = int(getattr(cfg, "detector_crop_reset_after_missed", 8))
+
+        camera_aoi_runtime = bool(getattr(cfg, "camera_aoi_runtime", False))
+        camera_aoi_update_every_groups = int(getattr(cfg, "camera_aoi_update_every_groups", 2))
+        camera_aoi_min_move_px = int(getattr(cfg, "camera_aoi_min_move_px", 8))
+        camera_aoi_smooth_alpha = float(getattr(cfg, "camera_aoi_smooth_alpha", 0.3))
+        camera_aoi_max_step_px = int(getattr(cfg, "camera_aoi_max_step_px", 160))
+        camera_aoi_recenter_after_missed = int(getattr(cfg, "camera_aoi_recenter_after_missed", 30))
     else:
         serials = [s.strip() for s in (args.serial or []) if s.strip()]
         if not serials:
@@ -658,6 +748,53 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         time_mapping_min_points = int(args.time_mapping_min_points)
         time_mapping_hard_outlier_ms = float(args.time_mapping_hard_outlier_ms)
 
+        detector_crop_size = int(getattr(args, "detector_crop_size", 0))
+        detector_crop_smooth_alpha = float(getattr(args, "detector_crop_smooth_alpha", 0.2))
+        detector_crop_max_step_px = int(getattr(args, "detector_crop_max_step_px", 120))
+        detector_crop_reset_after_missed = int(getattr(args, "detector_crop_reset_after_missed", 8))
+
+        camera_aoi_runtime = bool(getattr(args, "camera_aoi_runtime", False))
+        camera_aoi_update_every_groups = int(getattr(args, "camera_aoi_update_every_groups", 2))
+        camera_aoi_min_move_px = int(getattr(args, "camera_aoi_min_move_px", 8))
+        camera_aoi_smooth_alpha = float(getattr(args, "camera_aoi_smooth_alpha", 0.3))
+        camera_aoi_max_step_px = int(getattr(args, "camera_aoi_max_step_px", 160))
+        camera_aoi_recenter_after_missed = int(getattr(args, "camera_aoi_recenter_after_missed", 30))
+
+    if detector_crop_size < 0:
+        print("--detector-crop-size must be >= 0")
+        return 2
+    if detector_crop_max_step_px < 0:
+        print("--detector-crop-max-step-px must be >= 0")
+        return 2
+    if detector_crop_reset_after_missed < 0:
+        print("--detector-crop-reset-after-missed must be >= 0")
+        return 2
+    if not (0.0 <= float(detector_crop_smooth_alpha) <= 1.0):
+        print("--detector-crop-smooth-alpha must be in [0,1]")
+        return 2
+
+    if camera_aoi_update_every_groups < 0:
+        print("--camera-aoi-update-every-groups must be >= 0")
+        return 2
+    if bool(camera_aoi_runtime) and camera_aoi_update_every_groups < 1:
+        print("--camera-aoi-update-every-groups must be >= 1 when --camera-aoi-runtime is set")
+        return 2
+    if camera_aoi_min_move_px < 0:
+        print("--camera-aoi-min-move-px must be >= 0")
+        return 2
+    if camera_aoi_max_step_px < 0:
+        print("--camera-aoi-max-step-px must be >= 0")
+        return 2
+    if camera_aoi_recenter_after_missed < 0:
+        print("--camera-aoi-recenter-after-missed must be >= 0")
+        return 2
+    if not (0.0 <= float(camera_aoi_smooth_alpha) <= 1.0):
+        print("--camera-aoi-smooth-alpha must be in [0,1]")
+        return 2
+
+    # ROI 控制器在相机打开后再构建：两级 ROI 需要读取每台相机的 Width/Height/Offset 范围。
+    roi_controller = None
+
     if master_serial and master_serial not in serials:
         print("--master-serial must be one of the provided --serial values.")
         return 2
@@ -673,7 +810,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # 那么 detector 输出的 bbox/center 坐标是在 ROI 图像坐标系下（原点为 ROI 左上角）。
     # 但标定通常是按满幅分辨率做的（原点为满幅左上角）。
     # 为了让“检测像素坐标”与“标定内参”一致，这里把满幅标定转换为 ROI 标定（主点平移）。
-    if image_width is not None and image_height is not None:
+    if (not bool(camera_aoi_runtime)) and image_width is not None and image_height is not None:
         calib = apply_sensor_roi_to_calibration(
             calib,
             image_width=int(image_width),
@@ -752,6 +889,100 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             gain_auto="Off",
             gain=12.0,
         ) as cap:
+            # ROI 控制器（可选）：
+            # - 默认：不启用（roi_controller=None）
+            # - software crop：KinematicRoiController
+            # - 两级 ROI：TwoStageKinematicRoiController（相机 AOI offset + software crop）
+            if bool(camera_aoi_runtime):
+                aoi_state_by_camera: dict[str, CameraAoiState] = {}
+                for c in list(cap.cameras or []):
+                    serial = str(getattr(c, "serial", "") or "").strip()
+                    if not serial:
+                        continue
+
+                    w_info = get_int_node_info(binding=c.binding, cam=c.cam, key="Width")
+                    h_info = get_int_node_info(binding=c.binding, cam=c.cam, key="Height")
+                    ox_info = get_int_node_info(binding=c.binding, cam=c.cam, key="OffsetX")
+                    oy_info = get_int_node_info(binding=c.binding, cam=c.cam, key="OffsetY")
+
+                    # Width/Height 读取失败时，尽力回退到配置值（若用户未设置则无法安全推断）。
+                    aoi_w = int(w_info.cur) if w_info is not None else (int(image_width) if image_width is not None else 0)
+                    aoi_h = int(h_info.cur) if h_info is not None else (int(image_height) if image_height is not None else 0)
+
+                    if ox_info is None or oy_info is None:
+                        print(
+                            f"camera_aoi_runtime enabled but cannot read OffsetX/OffsetY node info for {serial}. "
+                            "请确认该机型在取流中 OffsetX/OffsetY 可读，并且未被权限/状态锁定。"
+                        )
+                        return 2
+                    if aoi_w <= 0 or aoi_h <= 0:
+                        print(
+                            f"camera_aoi_runtime enabled but cannot determine AOI size (Width/Height) for {serial}. "
+                            "请设置 --image-width/--image-height，或确保 Width/Height 节点可读。"
+                        )
+                        return 2
+
+                    aoi_state_by_camera[serial] = CameraAoiState(
+                        aoi_width=int(aoi_w),
+                        aoi_height=int(aoi_h),
+                        offset_x=int(ox_info.cur),
+                        offset_y=int(oy_info.cur),
+                        offset_x_info=ox_info,
+                        offset_y_info=oy_info,
+                        initial_offset_x=int(ox_info.cur),
+                        initial_offset_y=int(oy_info.cur),
+                    )
+
+                cameras_by_serial = {
+                    str(c.serial): c for c in list(cap.cameras or []) if str(getattr(c, "serial", "") or "").strip()
+                }
+
+                class _Applier:
+                    def __init__(self, cams: dict[str, Any]):
+                        self._cams = cams
+
+                    def set_offsets(self, *, camera: str, offset_x: int, offset_y: int) -> bool:
+                        c = self._cams.get(str(camera))
+                        if c is None:
+                            return False
+
+                        okx, _ = try_set_int_node(binding=c.binding, cam=c.cam, key="OffsetX", value=int(offset_x))
+                        oky, _ = try_set_int_node(binding=c.binding, cam=c.cam, key="OffsetY", value=int(offset_y))
+                        return bool(okx and oky)
+
+                roi_controller = TwoStageKinematicRoiController(
+                    crop_cfg=SoftwareCropConfig(
+                        crop_width=int(detector_crop_size),
+                        crop_height=int(detector_crop_size),
+                        smooth_alpha=float(detector_crop_smooth_alpha),
+                        max_step_px=int(detector_crop_max_step_px),
+                        reset_after_missed=int(detector_crop_reset_after_missed),
+                    ),
+                    camera_cfg=CameraAoiRuntimeConfig(
+                        enabled=True,
+                        update_every_groups=int(camera_aoi_update_every_groups),
+                        min_move_px=int(camera_aoi_min_move_px),
+                        smooth_alpha=float(camera_aoi_smooth_alpha),
+                        max_step_px=int(camera_aoi_max_step_px),
+                        recenter_after_missed=int(camera_aoi_recenter_after_missed),
+                    ),
+                    aoi_state_by_camera=aoi_state_by_camera,
+                    applier=_Applier(cameras_by_serial),
+                )
+            else:
+                if int(detector_crop_size) > 0:
+                    roi_controller = KinematicRoiController(
+                        cfg=KinematicRoiConfig(
+                            crop_width=int(detector_crop_size),
+                            crop_height=int(detector_crop_size),
+                            smooth_alpha=float(detector_crop_smooth_alpha),
+                            max_step_px=int(detector_crop_max_step_px),
+                            reset_after_missed=int(detector_crop_reset_after_missed),
+                        )
+                    )
+                else:
+                    roi_controller = None
+
             base_groups_iter = iter_mvs_image_groups(
                 cap=cap,
                 binding=binding,
@@ -783,6 +1014,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 max_uv_match_dist_px=float(max_uv_match_dist_px),
                 merge_dist_m=float(merge_dist_m),
                 include_detection_details=True,
+                roi_controller=roi_controller,
             )
 
             # 可选：对 3D 输出做轨迹拟合增强（落点/落地时间/走廊）。

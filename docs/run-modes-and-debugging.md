@@ -107,6 +107,31 @@ python -m tennis3d.apps.online_mvs_localize \
   --config configs/online_pt_windows_cpu_software_trigger_params_4cam.yaml
 ```
 
+### C) 两级 ROI（推荐：先带宽，再推理）
+
+适用场景：
+- 满幅 2448×2048 带宽/解码压力大，导致采集 FPS 上不去；
+- 但直接把相机 AOI 缩得过小又容易丢球；
+- 你希望把“带宽瓶颈”和“推理瓶颈”拆开分别优化。
+
+做法：
+1) **相机侧 AOI（Sensor ROI）**：设置 `image_width/image_height/image_offset_*`，让相机只输出一个较大的窗口（比如 1280×1080），主要用于降带宽。
+2) **主机软件裁剪（detector_crop_*）**：在 detector 前再裁成 640×640（或类似大小）来提升推理吞吐，并把 bbox 坐标回写到 AOI 坐标系下，保证几何一致。
+
+本仓库已内置两级 ROI 的配置样例：
+
+```bash
+python -m tennis3d.apps.online_mvs_localize \
+  --config configs/online_pt_windows_cpu_two_level_roi_4cam.yaml
+```
+
+要点/常见坑：
+- MVS 的 ROI 是**裁剪不是缩放**。标定通常按满幅做的，因此在线入口会在你配置 `image_width/image_height` 时自动调用
+  `tennis3d.geometry.calibration.apply_sensor_roi_to_calibration()` 做主点平移，确保像素坐标与标定一致。
+- `image_offset_x/y` 往往有步进（Inc，例如 4）。配置里尽量用对齐后的值（例如 584/484）。
+- 如果你的相机是“固定 AOI（Width/Height 不可写）但 Offset 可写”，只要当前输出尺寸确实等于你填的 `image_width/height`，
+  仍建议保留这两个字段用于标定修正。
+
 预期输出（最小）：
 
 - 启动后会先提示 `Waiting for first ball observation...`

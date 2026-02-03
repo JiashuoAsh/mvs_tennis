@@ -46,6 +46,32 @@ detector: pt
 # detector=pt 时必填（.pt）
 model: data/models/best.pt
 
+# 软件裁剪（动态 ROI，可选）：在 detector 前裁剪小窗口以提高吞吐。
+# - detector_crop_size=0 表示关闭（默认）。
+# - 若启用：建议先确保“整幅（或相机 ROI）”里能稳定检测到第一颗球；锁定后再由动态裁剪跟随。
+# detector_crop_size: 640
+# detector_crop_smooth_alpha: 0.2
+# detector_crop_max_step_px: 120
+# detector_crop_reset_after_missed: 8
+
+# 相机侧 AOI（可选，进阶）：固定窗口 + 运行中平移 OffsetX/OffsetY，用于先降带宽再降算力。
+# 典型用法：
+# 1) 先用 image_width/image_height 把相机输出裁到一个“足够大、不易丢球”的窗口（例如 1280x1080）
+# 2) 再启用 camera_aoi_runtime，让窗口跟随球移动（降低满幅抓取带宽）
+# 3) 如需进一步提速，可叠加上面的 detector_crop_size=640（在 AOI 内二次软件裁剪）
+#
+# 注意：camera_aoi_runtime 需要具体机型支持运行中写 OffsetX/OffsetY；不支持时会更新失败。
+# image_width: 1280
+# image_height: 1080
+# image_offset_x: 0
+# image_offset_y: 0
+# camera_aoi_runtime: true
+# camera_aoi_update_every_groups: 2
+# camera_aoi_min_move_px: 8
+# camera_aoi_smooth_alpha: 0.3
+# camera_aoi_max_step_px: 160
+# camera_aoi_recenter_after_missed: 30
+
 min_score: 0.25
 require_views: 2
 
@@ -79,13 +105,45 @@ trigger:
 #
 # curve:
 #   enabled: false
+#   primary: v3
 #   compare_v2: false
 #   compare_v3_legacy: false
 #   max_tracks: 4
 #   association_dist_m: 0.6
 #   max_missed_s: 0.6
+#   min_dt_s: 0.000001
 #   corridor_y_min: 0.6
 #   corridor_y_max: 1.6
 #   corridor_y_step: 0.1
 #   conf_from: quality
 #   constant_conf: 1.0
+#   y_offset_m: 0.0
+#   y_negate: false
+#   is_bot_fire: -1
+#
+#   # 观测过滤（默认关闭；需要上游定位输出包含对应诊断字段）
+#   obs_min_views: 0
+#   obs_min_quality: 0.0
+#   obs_max_median_reproj_error_px: null
+#   obs_max_ball_3d_std_m: null
+#
+#   # 轨迹片段（episode）判定（默认关闭）
+#   # 起始判定固定为：z 方向门控 + y 轴重力一致性（ay≈g）。
+#   episode_enabled: false
+#   episode_buffer_s: 0.6
+#   episode_min_obs: 5
+#   episode_z_dir: 0
+#   episode_min_abs_dz_m: 0.25
+#   episode_min_abs_vz_mps: 1.0
+#   episode_gravity_mps2: 9.8
+#   episode_gravity_tol_mps2: 3.0
+#
+#   # 结束判定
+#   episode_stationary_speed_mps: 0.25
+#   episode_end_if_stationary_s: 0.35
+#   episode_end_after_predicted_land_s: 0.2
+#
+#   # episode 行为
+#   reset_predictor_on_episode_start: true
+#   reset_predictor_on_episode_end: true
+#   feed_curve_only_when_episode_active: false

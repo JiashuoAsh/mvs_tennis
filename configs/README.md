@@ -55,6 +55,24 @@
 - 终端在检测到球时会打印包含 `xyz_w=(x=..., y=..., z=...)` 的行。
 - 若 `out_jsonl` 非空：对应的 jsonl 文件会持续追加记录，且每行包含 `balls` 字段。
 
+### 在线：软件裁剪（动态 ROI，可选）
+
+适用场景：
+
+- 你希望 detector 的输入更小（例如 640×640），以提升 FPS/稳定性；但球在大视野内移动，静态小 ROI 会丢球。
+
+配置方式（在对应 online YAML 顶层增加字段）：
+
+- `detector_crop_size`：裁剪窗口边长（正方形），0 表示关闭。
+- `detector_crop_smooth_alpha`：平滑系数 $\in[0,1]$，越大越稳（跟随更慢）。
+- `detector_crop_max_step_px`：每个 group 最大移动像素（0 表示不限制）。
+- `detector_crop_reset_after_missed`：连续 N 个 group 无球则重置（回到“等待首次锁定”状态）。
+
+注意：
+
+- 软件裁剪发生在 detector 前；detector 输出 bbox 会自动加回裁剪 offset，因此下游三角化仍使用原图像素坐标系。
+- 若启用裁剪但尚未锁定到第一颗球，程序会先对整幅图（或相机输出 ROI）做推理；一旦锁定到球，再进入动态裁剪跟随。
+
 ### 在线：主从触发（Line0）
 
 命令：

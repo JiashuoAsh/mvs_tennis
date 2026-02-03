@@ -145,6 +145,14 @@ def _as_curve_stage_config(x: Any) -> CurveStageConfig:
     if conf_from not in {"quality", "constant"}:
         raise RuntimeError("curve.conf_from must be 'quality' or 'constant'")
 
+    # 可选浮点字段：先取 raw，再转换，避免 None/Unknown 触发类型告警。
+    obs_max_median_reproj_error_px = x.get("obs_max_median_reproj_error_px")
+    obs_max_median_reproj_error_px_f = (
+        float(obs_max_median_reproj_error_px) if obs_max_median_reproj_error_px is not None else None
+    )
+    obs_max_ball_3d_std_m = x.get("obs_max_ball_3d_std_m")
+    obs_max_ball_3d_std_m_f = float(obs_max_ball_3d_std_m) if obs_max_ball_3d_std_m is not None else None
+
     cfg = CurveStageConfig(
         enabled=bool(x.get("enabled", False)),
         primary=primary,
@@ -162,6 +170,33 @@ def _as_curve_stage_config(x: Any) -> CurveStageConfig:
         y_offset_m=float(x.get("y_offset_m", 0.0)),
         y_negate=bool(x.get("y_negate", False)),
         is_bot_fire=int(x.get("is_bot_fire", -1)),
+
+        # 观测过滤（默认关闭）
+        obs_min_views=int(x.get("obs_min_views", 0)),
+        obs_min_quality=float(x.get("obs_min_quality", 0.0)),
+        obs_max_median_reproj_error_px=obs_max_median_reproj_error_px_f,
+        obs_max_ball_3d_std_m=obs_max_ball_3d_std_m_f,
+
+        # episode（默认关闭）
+        episode_enabled=bool(x.get("episode_enabled", False)),
+        episode_buffer_s=float(x.get("episode_buffer_s", 0.6)),
+        # 说明：episode_start 判定固定为“z 方向门控 + y 轴重力一致性”，
+        # 因此这里的最小点数要求至少 3（建议更高）。
+        episode_min_obs=int(x.get("episode_min_obs", 5)),
+        episode_z_dir=int(x.get("episode_z_dir", 0)),
+        episode_min_abs_dz_m=float(x.get("episode_min_abs_dz_m", 0.25)),
+        episode_min_abs_vz_mps=float(x.get("episode_min_abs_vz_mps", 1.0)),
+        episode_gravity_mps2=float(x.get("episode_gravity_mps2", 9.8)),
+        episode_gravity_tol_mps2=float(x.get("episode_gravity_tol_mps2", 3.0)),
+        episode_stationary_speed_mps=float(x.get("episode_stationary_speed_mps", 0.25)),
+        episode_end_if_stationary_s=float(x.get("episode_end_if_stationary_s", 0.35)),
+        episode_end_after_predicted_land_s=float(x.get("episode_end_after_predicted_land_s", 0.2)),
+        reset_predictor_on_episode_start=bool(x.get("reset_predictor_on_episode_start", True)),
+        reset_predictor_on_episode_end=bool(x.get("reset_predictor_on_episode_end", True)),
+        feed_curve_only_when_episode_active=bool(x.get("feed_curve_only_when_episode_active", False)),
+
+        # episode 多 track 处置策略（默认关闭）
+        episode_lock_single_track=bool(x.get("episode_lock_single_track", False)),
     )
 
     if cfg.max_tracks <= 0:
@@ -176,6 +211,37 @@ def _as_curve_stage_config(x: Any) -> CurveStageConfig:
         raise RuntimeError("curve.corridor_y_step must be > 0")
     if cfg.corridor_y_max <= cfg.corridor_y_min:
         raise RuntimeError("curve.corridor_y_max must be > curve.corridor_y_min")
+
+    if cfg.obs_min_views < 0:
+        raise RuntimeError("curve.obs_min_views must be >= 0")
+    if cfg.obs_min_quality < 0:
+        raise RuntimeError("curve.obs_min_quality must be >= 0")
+    if cfg.obs_max_median_reproj_error_px is not None and cfg.obs_max_median_reproj_error_px <= 0:
+        raise RuntimeError("curve.obs_max_median_reproj_error_px must be > 0")
+    if cfg.obs_max_ball_3d_std_m is not None and cfg.obs_max_ball_3d_std_m <= 0:
+        raise RuntimeError("curve.obs_max_ball_3d_std_m must be > 0")
+
+    # episode 相关约束：即使未启用也做基本健壮性校验，避免写错配置后静默异常。
+    if cfg.episode_buffer_s < 0:
+        raise RuntimeError("curve.episode_buffer_s must be >= 0")
+    if cfg.episode_min_obs < 3:
+        raise RuntimeError("curve.episode_min_obs must be >= 3")
+    if cfg.episode_z_dir not in {-1, 0, 1}:
+        raise RuntimeError("curve.episode_z_dir must be -1, 0 or 1")
+    if cfg.episode_min_abs_dz_m < 0:
+        raise RuntimeError("curve.episode_min_abs_dz_m must be >= 0")
+    if cfg.episode_min_abs_vz_mps < 0:
+        raise RuntimeError("curve.episode_min_abs_vz_mps must be >= 0")
+    if cfg.episode_gravity_mps2 <= 0:
+        raise RuntimeError("curve.episode_gravity_mps2 must be > 0")
+    if cfg.episode_gravity_tol_mps2 < 0:
+        raise RuntimeError("curve.episode_gravity_tol_mps2 must be >= 0")
+    if cfg.episode_stationary_speed_mps < 0:
+        raise RuntimeError("curve.episode_stationary_speed_mps must be >= 0")
+    if cfg.episode_end_if_stationary_s < 0:
+        raise RuntimeError("curve.episode_end_if_stationary_s must be >= 0")
+    if cfg.episode_end_after_predicted_land_s < 0:
+        raise RuntimeError("curve.episode_end_after_predicted_land_s must be >= 0")
 
     return cfg
 
@@ -298,6 +364,28 @@ class OnlineAppConfig:
     # 可选：轨迹拟合后处理（落点/落地时间/走廊）。默认 disabled。
     curve: CurveStageConfig = CurveStageConfig()
 
+    # 可选：软件裁剪（动态 ROI）。
+    # 说明：
+    # - 该裁剪发生在 detector 前，不需要逐帧修改相机 ROI 或标定。
+    # - detector 输出 bbox 会自动加回裁剪 offset，保证下游仍是“原图像素坐标系”。
+    # - detector_crop_size=0 表示关闭（默认）。
+    detector_crop_size: int = 0
+    detector_crop_smooth_alpha: float = 0.2
+    detector_crop_max_step_px: int = 120
+    detector_crop_reset_after_missed: int = 8
+
+    # 可选：相机侧 AOI（OffsetX/OffsetY）运行中平移。
+    # 说明：
+    # - 该能力依赖具体机型/固件：有些机型 StartGrabbing 后会锁定 OffsetX/OffsetY。
+    # - 一旦启用，**不要**对 calib 做 apply_sensor_roi_to_calibration 的一次性主点平移；
+    #   而是让 RoiController 返回每相机的 total_offset，把 bbox/uv 回写到满幅坐标系。
+    camera_aoi_runtime: bool = False
+    camera_aoi_update_every_groups: int = 2
+    camera_aoi_min_move_px: int = 8
+    camera_aoi_smooth_alpha: float = 0.3
+    camera_aoi_max_step_px: int = 160
+    camera_aoi_recenter_after_missed: int = 30
+
     trigger: OnlineTriggerConfig = OnlineTriggerConfig()
 
 
@@ -412,6 +500,40 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
     image_offset_x = _as_int(data.get("image_offset_x"), 0)
     image_offset_y = _as_int(data.get("image_offset_y"), 0)
 
+    detector_crop_size = _as_int(data.get("detector_crop_size"), 0)
+    detector_crop_smooth_alpha = float(data.get("detector_crop_smooth_alpha", 0.2))
+    detector_crop_max_step_px = _as_int(data.get("detector_crop_max_step_px"), 120)
+    detector_crop_reset_after_missed = _as_int(data.get("detector_crop_reset_after_missed"), 8)
+
+    camera_aoi_runtime = bool(data.get("camera_aoi_runtime", False))
+    camera_aoi_update_every_groups = _as_int(data.get("camera_aoi_update_every_groups"), 2)
+    camera_aoi_min_move_px = _as_int(data.get("camera_aoi_min_move_px"), 8)
+    camera_aoi_smooth_alpha = float(data.get("camera_aoi_smooth_alpha", 0.3))
+    camera_aoi_max_step_px = _as_int(data.get("camera_aoi_max_step_px"), 160)
+    camera_aoi_recenter_after_missed = _as_int(data.get("camera_aoi_recenter_after_missed"), 30)
+
+    if detector_crop_size < 0:
+        raise RuntimeError("online config detector_crop_size must be >= 0")
+    if detector_crop_max_step_px < 0:
+        raise RuntimeError("online config detector_crop_max_step_px must be >= 0")
+    if detector_crop_reset_after_missed < 0:
+        raise RuntimeError("online config detector_crop_reset_after_missed must be >= 0")
+    if not (0.0 <= float(detector_crop_smooth_alpha) <= 1.0):
+        raise RuntimeError("online config detector_crop_smooth_alpha must be in [0,1]")
+
+    if camera_aoi_update_every_groups < 0:
+        raise RuntimeError("online config camera_aoi_update_every_groups must be >= 0")
+    if bool(camera_aoi_runtime) and camera_aoi_update_every_groups < 1:
+        raise RuntimeError("online config camera_aoi_update_every_groups must be >= 1 when camera_aoi_runtime=true")
+    if camera_aoi_min_move_px < 0:
+        raise RuntimeError("online config camera_aoi_min_move_px must be >= 0")
+    if camera_aoi_max_step_px < 0:
+        raise RuntimeError("online config camera_aoi_max_step_px must be >= 0")
+    if camera_aoi_recenter_after_missed < 0:
+        raise RuntimeError("online config camera_aoi_recenter_after_missed must be >= 0")
+    if not (0.0 <= float(camera_aoi_smooth_alpha) <= 1.0):
+        raise RuntimeError("online config camera_aoi_smooth_alpha must be in [0,1]")
+
     # 约束：宽高必须同时设置，避免出现“只裁宽不裁高”的歧义。
     if (image_width is None) ^ (image_height is None):
         raise RuntimeError(
@@ -457,4 +579,16 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         time_mapping_hard_outlier_ms=time_mapping_hard_outlier_ms,
         trigger=trigger,
         curve=curve,
+
+        detector_crop_size=int(detector_crop_size),
+        detector_crop_smooth_alpha=float(detector_crop_smooth_alpha),
+        detector_crop_max_step_px=int(detector_crop_max_step_px),
+        detector_crop_reset_after_missed=int(detector_crop_reset_after_missed),
+
+        camera_aoi_runtime=bool(camera_aoi_runtime),
+        camera_aoi_update_every_groups=int(camera_aoi_update_every_groups),
+        camera_aoi_min_move_px=int(camera_aoi_min_move_px),
+        camera_aoi_smooth_alpha=float(camera_aoi_smooth_alpha),
+        camera_aoi_max_step_px=int(camera_aoi_max_step_px),
+        camera_aoi_recenter_after_missed=int(camera_aoi_recenter_after_missed),
     )

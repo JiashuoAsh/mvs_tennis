@@ -20,6 +20,8 @@ from tennis3d.detectors import Detector
 from tennis3d.geometry.calibration import CalibrationSet
 from tennis3d.geometry.triangulation import estimate_triangulation_cov_world
 from tennis3d.localization.localize import localize_balls
+from tennis3d.pipeline.roi import RoiController
+from tennis3d.preprocess import shift_detections
 from tennis3d.sync.aligner import PassthroughAligner, SyncAligner
 
 
@@ -91,6 +93,7 @@ def run_localization_pipeline(
     merge_dist_m: float,
     include_detection_details: bool = True,
     aligner: SyncAligner | None = None,
+    roi_controller: RoiController | None = None,
 ) -> Iterator[dict[str, Any]]:
     """对输入 groups 运行端到端定位流水线。
 
@@ -129,7 +132,31 @@ def run_localization_pipeline(
         for serial, img in images_by_camera.items():
             if img is None:
                 continue
-            dets = detector.detect(img)
+
+            # 可选：软件裁剪（动态 ROI）以降低 detector 输入尺寸。
+            # 注意：裁剪坐标系下的 bbox 需要加回 offset 才能保持下游几何一致。
+            img_for_det = img
+            offset_xy = (0, 0)
+            if roi_controller is not None:
+                try:
+                    img_for_det, offset_xy = roi_controller.preprocess_for_detection(
+                        meta=meta,
+                        camera=str(serial),
+                        img_bgr=img,
+                        calib=calib,
+                    )
+                except Exception:
+                    img_for_det = img
+                    offset_xy = (0, 0)
+
+            dets = detector.detect(img_for_det)
+            if dets and (offset_xy[0] != 0 or offset_xy[1] != 0):
+                dets = shift_detections(
+                    list(dets),
+                    dx=int(offset_xy[0]),
+                    dy=int(offset_xy[1]),
+                    clip_shape=(int(img.shape[0]), int(img.shape[1])),
+                )
             if dets:
                 detections_by_camera[str(serial)] = list(dets)
 
@@ -283,5 +310,11 @@ def run_localization_pipeline(
             **(meta or {}),
             "balls": balls_out,
         }
+
+        if roi_controller is not None:
+            try:
+                roi_controller.update_after_output(out_rec=out_rec, calib=calib)
+            except Exception:
+                pass
 
         yield out_rec
