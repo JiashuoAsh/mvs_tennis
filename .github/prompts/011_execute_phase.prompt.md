@@ -1,14 +1,14 @@
 ---
 name: 011_execute_phase
 description: "按 Phase 批量重构：一次处理一组热点/目录调整 + 冒烟验证（可控大步子）"
-argument-hint: "phase=1/2/3; targets=逗号分隔路径; goal=一句话目标; breaking=1/0（默认1）"
+argument-hint: "phase=1/2/3; targets=逗号分隔路径; goal=一句话目标; breaking=1/0（默认0）"
 agent: "agent"
 ---
 
 本次执行的 Phase：${input:phase:填 1/2/3}
 本次处理范围 targets（逗号分隔，文件或目录）：${input:targets:例如 utils.py,libs/apriltag_perf,mcca/entry/step4_multi_extrinsic.py}
 本次目标（一句话）：${input:goal:例如“修正依赖方向并建立最小库/入口边界”}
-是否允许破坏式变更：${input:breaking:1=允许修改对外入口/清零旧路径（默认1）；0=保持对外入口尽量不变}
+是否允许破坏式变更：${input:breaking:1=允许修改对外入口/清零旧路径（默认0）；0=保持对外入口尽量不变}
 
 原则：允许一次性处理多个文件/目录，但必须“批量且有边界”，不能变成全仓库随意大改。
 硬约束：默认不新增第三方依赖；当收益明显时允许（必须说明必要性/替代方案/影响面，并同步更新依赖声明如 pyproject.toml/锁文件与最小验证）；不做过度设计；保持既有行为不变（除非明确说明）；中文注释/log/docstring。

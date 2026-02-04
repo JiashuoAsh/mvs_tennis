@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-tennis3d-online = "tennis3d.apps.online_mvs_localize:main"
+tennis3d-online = "tennis3d.apps.online.entry:main"
 tennis3d-offline = "tennis3d.apps.offline_localize_from_captures:main"
 tennis3d-fake-calib = "tennis3d.apps.fake_calibration:main"
 tennis3d-offline-detect = "tennis3d.apps.offline_detect:main"
@@ -38,6 +38,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-# 说明：仓库里存在 tools/test_*.py 之类的“工具脚本”。
-# 为避免与单测语义混淆、也避免 pytest 误收集，把测试发现范围固定到 tests/。
+# 说明：`tools/` 仅放“可执行工具脚本”，不属于单元测试。
+# 约定：tools 下脚本禁止使用 `test_*.py` / `*_test.py` 这类命名，避免与单测语义混淆。
+# 为确保测试发现范围稳定，pytest 的收集范围固定到 `tests/`（不会误收集 tools/、examples/ 等目录）。
 testpaths = ["tests"]

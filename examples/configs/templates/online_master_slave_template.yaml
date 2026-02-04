@@ -5,7 +5,7 @@
 # - 你希望只对 master 下发软触发，由 master 输出线触发 slave
 #
 # 用法示例：
-# - uv run python -m tennis3d.apps.online_mvs_localize --config examples/configs/templates/online_master_slave_template.yaml
+# - uv run python -m tennis3d.apps.online --config examples/configs/templates/online_master_slave_template.yaml
 
 # MVS Python 示例绑定目录（MvImport，可选）：
 mvimport_dir: ""
@@ -76,7 +76,7 @@ trigger:
   master_line_source: ""
   master_line_mode: Output
 
-  trigger_activation: RisingEdge
+  trigger_activation: FallingEdge
   trigger_cache_enable: false
 
 # 可选：轨迹拟合后处理（curve v3）。默认 disabled。

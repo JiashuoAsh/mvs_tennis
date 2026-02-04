@@ -10,6 +10,7 @@ from typing import Any, Optional
 from tennis3d.detectors import create_detector
 from tennis3d.config import load_offline_app_config
 from tennis3d.geometry.calibration import load_calibration
+from tennis3d.io.sample_sequence import ensure_sample_sequence
 from tennis3d.pipeline import iter_capture_image_groups, run_localization_pipeline
 from tennis3d.trajectory import CurveStageConfig, apply_curve_stage
 
@@ -98,6 +99,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[list[str]] = None) -> int:
     args = build_arg_parser().parse_args(argv)
 
+    default_sample_dir = (Path(__file__).resolve().parents[3] / "data" / "captures" / "sample_sequence").resolve()
+
     if str(getattr(args, "config", "") or "").strip():
         cfg = load_offline_app_config(Path(str(args.config)).resolve())
         captures_dir = Path(cfg.captures_dir).resolve()
@@ -135,6 +138,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         curve_cfg = CurveStageConfig()
         time_sync_mode = "frame_host_timestamp"
         time_mapping_path = None
+
+    # 说明：当用户直接运行离线入口且未提供 --captures-dir 时，我们希望“一键跑通”。
+    # sample_sequence 不随仓库提交二进制图片，因此当默认目录缺失 metadata.jsonl 时，
+    # 这里会自动生成一份最小可运行数据集。
+    if captures_dir == default_sample_dir and not (captures_dir / "metadata.jsonl").exists():
+        ensure_sample_sequence(captures_dir=captures_dir)
 
     calib = load_calibration(calib_path)
 

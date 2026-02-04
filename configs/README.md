@@ -48,7 +48,7 @@
 
 命令：
 
-- `uv run python -m tennis3d.apps.online_mvs_localize --config configs/online_pt_windows_cpu_software_trigger.yaml`
+- `uv run python -m tennis3d.apps.online --config configs/online_pt_windows_cpu_software_trigger.yaml`
 
 验证标准：
 
@@ -77,7 +77,7 @@
 
 命令：
 
-- `uv run python -m tennis3d.apps.online_mvs_localize --config configs/online_master_slave_line0.yaml`
+- `uv run python -m tennis3d.apps.online --config configs/online_master_slave_line0.yaml`
 
 验证标准：
 

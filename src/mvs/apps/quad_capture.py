@@ -26,9 +26,12 @@ from typing import Literal, Optional, Sequence, cast
 
 from mvs import MvsDllNotFoundError, load_mvs_binding
 from mvs.camera import MvsSdk
-from mvs.capture_session import CaptureSessionConfig, GroupBy, SaveMode, build_trigger_plan, normalize_roi, run_capture_session
+from mvs.capture_session_recording import run_capture_session
+from mvs.capture_session_types import CaptureSessionConfig, GroupBy, SaveMode
+from mvs.triggering import build_trigger_plan
 from mvs.devices import enumerate_devices
 from mvs.paths import repo_root
+from mvs.roi import normalize_roi
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -130,7 +133,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument(
         "--trigger-activation",
-        default="RisingEdge",
+        default="FallingEdge",
         help="触发沿（例如 RisingEdge/FallingEdge）",
     )
 
@@ -327,6 +330,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             serials=serials,
             trigger_source=str(args.trigger_source),
             master_serial=master_serial,
+            soft_trigger_fps=float(args.soft_trigger_fps),
         )
     except ValueError as exc:
         print(str(exc))

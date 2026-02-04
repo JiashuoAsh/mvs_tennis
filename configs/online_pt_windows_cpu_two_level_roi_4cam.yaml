@@ -5,7 +5,7 @@
 # 2) 第二级（主机软件裁剪 / detector_crop_*）：优先为推理服务（减少 detector 输入尺寸）。
 #
 # 用法示例：
-# - uv run python -m tennis3d.apps.online_mvs_localize --config configs/online_pt_windows_cpu_two_level_roi_4cam.yaml
+# - uv run python -m tennis3d.apps.online --config configs/online_pt_windows_cpu_two_level_roi_4cam.yaml
 # - tennis3d-online --config configs/online_pt_windows_cpu_two_level_roi_4cam.yaml
 
 # SDK DLL 目录（按你的本机 SDK 安装位置调整；留空表示使用系统 PATH）

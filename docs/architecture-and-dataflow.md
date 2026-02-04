@@ -27,7 +27,7 @@
 
 ### 网球 3D 定位（tennis3d）
 
-- 在线定位：`python -m tennis3d.apps.online_mvs_localize`
+- 在线定位：`python -m tennis3d.apps.online`
   - 调用链：
     - `mvs.pipeline.open_quad_capture()` 打开相机与组包
     - `tennis3d.pipeline.iter_mvs_image_groups()` 把 `FramePacket` 转为 OpenCV BGR 图
@@ -113,7 +113,7 @@ $$X_c = R_{wc} X_w + t_{wc}$$
 $$P = K [R_{wc} | t_{wc}]$$
 
 关键点：标定中 `cameras` 的 key 必须与 pipeline 使用的“相机名”一致。
-- 在线/离线（captures）模式下，默认相机名为 **serial 字符串**（见 `tennis3d.pipeline.sources`）。
+- 在线/离线（captures）模式下，默认相机名为 **serial 字符串**（见 `tennis3d.pipeline` 的 sources 公共出口）。
 - 如果你的标定用 cam0/cam1 命名，会导致相机被跳过（见改进建议）。
 
 ### 3) 3D 输出（JSONL）

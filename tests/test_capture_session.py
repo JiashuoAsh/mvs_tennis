@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import unittest
 
-from mvs.capture_session import build_trigger_plan, normalize_roi
+from mvs.triggering import build_trigger_plan
+from mvs.roi import normalize_roi
 
 
 class TestCaptureSessionHelpers(unittest.TestCase):

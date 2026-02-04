@@ -178,7 +178,7 @@ def main() -> int:
             serial=str(args.serial),
             tlayer_type=int(tlayer_type),
             trigger_source="Software",
-            trigger_activation="RisingEdge",
+            trigger_activation="FallingEdge",
             trigger_cache_enable=True,
             pixel_format="",
             image_width=int(args.roi_width),

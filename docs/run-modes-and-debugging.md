@@ -43,7 +43,7 @@ python -m mvs.apps.quad_capture \
   --master-line-source ExposureStartActive \
   --soft-trigger-fps 18 \
   --trigger-source Line0 \
-  --trigger-activation RisingEdge \
+  --trigger-activation FallingEdge \
   --save-mode sdk-bmp \
   --max-groups 10 \
   --max-wait-seconds 10
@@ -95,7 +95,7 @@ python -m tennis3d.apps.offline_localize_from_captures \
 ### B) 在线（连接相机）
 
 ```bash
-python -m tennis3d.apps.online_mvs_localize \
+python -m tennis3d.apps.online \
   --serial <SN0> <SN1> <SN2> <SN3> \
   --calib data/calibration/example_triple_camera_calib.json \
   --detector fake \
@@ -103,7 +103,7 @@ python -m tennis3d.apps.online_mvs_localize \
 ```
 
 ```bash
-python -m tennis3d.apps.online_mvs_localize \
+python -m tennis3d.apps.online \
   --config configs/online_pt_windows_cpu_software_trigger_params_4cam.yaml
 ```
 
@@ -121,7 +121,7 @@ python -m tennis3d.apps.online_mvs_localize \
 本仓库已内置两级 ROI 的配置样例：
 
 ```bash
-python -m tennis3d.apps.online_mvs_localize \
+python -m tennis3d.apps.online \
   --config configs/online_pt_windows_cpu_two_level_roi_4cam.yaml
 ```
 

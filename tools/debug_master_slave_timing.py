@@ -44,6 +44,7 @@ from typing import Any, Iterable
 
 from mvs.metadata_io import iter_metadata_records
 from mvs.time_mapping import LinearTimeMapping, load_time_mappings_json
+from tennis3d.pipeline.time_utils import host_timestamp_to_ms_epoch, median_float
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,55 +69,6 @@ class _EventRec:
     event_ts: int
     created_at: float | None
     host_monotonic: float | None
-
-
-def _host_timestamp_to_ms_epoch(ts: Any) -> float | None:
-    """把 host_timestamp（可能是 ms/ns/s）转换成 epoch 毫秒。
-
-    说明：
-        SDK 的 `nHostTimeStamp` 注释只写了“host-generated timestamp”，不同机型/版本/配置
-        可能返回不同单位。
-
-        这里采用数量级启发式（与 `tennis3d.pipeline.sources` 的逻辑保持一致）：
-        - >= 1e16 认为是 ns epoch
-        - >= 1e11 认为是 ms epoch
-        - >= 1e8 认为是 s epoch
-
-    Args:
-        ts: 原始值。
-
-    Returns:
-        epoch 毫秒（float），或 None。
-    """
-
-    try:
-        v = int(ts)
-    except Exception:
-        return None
-
-    if v <= 0:
-        return None
-
-    # ns epoch
-    if v >= 10**16:
-        return float(v) / 1e6
-    # ms epoch
-    if v >= 10**11:
-        return float(v)
-    # s epoch
-    if v >= 10**8:
-        return float(v) * 1000.0
-
-    return None
-
-
-def _median_no_interp(values: list[float]) -> float | None:
-    """中位数（不插值，偶数时取上中位数）。"""
-
-    if not values:
-        return None
-    xs = sorted(float(v) for v in values)
-    return float(xs[len(xs) // 2])
 
 
 def _percentile_nearest_rank(sorted_values: list[float], q: float) -> float | None:
@@ -227,7 +179,7 @@ def _extract_frames_from_group(group: dict[str, Any]) -> list[_FrameRec]:
             except Exception:
                 host_ts_int = None
 
-        host_ms_epoch = _host_timestamp_to_ms_epoch(host_ts_int) if host_ts_int is not None else None
+        host_ms_epoch = host_timestamp_to_ms_epoch(host_ts_int) if host_ts_int is not None else None
 
         out.append(
             _FrameRec(
@@ -351,7 +303,7 @@ def main(argv: list[str] | None = None) -> int:
         # --- host_timestamp（归一化为 ms_epoch）---
         host_ms = {fr.serial: fr.host_ms_epoch for fr in frames if fr.host_ms_epoch is not None}
         if len(host_ms) >= 2:
-            med = _median_no_interp(list(host_ms.values()))
+            med = median_float(list(host_ms.values()))
             if med is not None:
                 for s, v in host_ms.items():
                     _add_delta(delta_host_ms_by_serial, s, float(v) - float(med))
@@ -366,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
                 mapped_ms[fr.serial] = float(m.map_dev_to_host_ms(fr.dev_ts))
 
             if len(mapped_ms) >= 2:
-                med = _median_no_interp(list(mapped_ms.values()))
+                med = median_float(list(mapped_ms.values()))
                 if med is not None:
                     for s, v in mapped_ms.items():
                         _add_delta(delta_mapped_ms_by_serial, s, float(v) - float(med))
@@ -419,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
             if master and mappings is not None and master in mapped_ms:
                 others = [v for s, v in mapped_ms.items() if s != master]
                 if others:
-                    others_med = _median_no_interp(others)
+                    others_med = median_float(others)
                     if others_med is not None:
                         print(f"- master({master}) vs others_median: dt={mapped_ms[master] - others_med:.3f}ms")
 
@@ -474,7 +426,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # 最后的“人话提示”
     if mappings is not None and master and master in delta_mapped_ms_by_serial:
-        m_med = _median_no_interp(delta_mapped_ms_by_serial.get(master, []))
+        m_med = median_float(delta_mapped_ms_by_serial.get(master, []))
         if m_med is not None and abs(float(m_med)) >= 5.0:
             print(
                 "\n提示：master 在映射后时间轴上的偏移仍然显著（>=5ms）。这通常不是字段缺失，而是触发链路/IO 输出模式导致的真实曝光时刻偏移。\n"

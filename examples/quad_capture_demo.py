@@ -72,7 +72,7 @@ def example_quad_capture_one_group():
             binding=binding,
             serials=serials,
             trigger_sources=[trigger_source] * len(serials),
-            trigger_activation="RisingEdge",
+            trigger_activation="FallingEdge",
             trigger_cache_enable=False,
             timeout_ms=1000,
             group_timeout_ms=500,  # 给充足时间凑齐 4 张
@@ -127,7 +127,7 @@ def example_batch_capture():
             binding=binding,
             serials=serials,
             trigger_sources=["Software"] * len(serials),
-            trigger_activation="RisingEdge",
+            trigger_activation="FallingEdge",
             trigger_cache_enable=False,
             timeout_ms=1000,
             group_timeout_ms=500,

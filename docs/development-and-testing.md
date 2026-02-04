@@ -13,6 +13,25 @@ uv sync
 uv pip install -e .
 ```
 
+## 构建/安装产物（egg-info）
+
+当你执行 `uv pip install -e .`（或 `pip install -e .`）时，setuptools 可能会在工作区生成 `*.egg-info/` 目录（例如 `mvs_deployment.egg-info/`），用于存放安装元数据（入口点、依赖列表等）。
+
+- 这类目录属于构建/安装产物，不应作为源码的一部分长期维护。
+- 本仓库的 `.gitignore` 已忽略 `*.egg-info/`，避免将其误提交入库。
+- 如果你希望保持工作区整洁，可以直接删除；下次安装时会自动重新生成。
+
+PowerShell 示例：
+
+```powershell
+Remove-Item -Recurse -Force mvs_deployment.egg-info, src/mvs_deployment.egg-info
+```
+
+验证标准：
+
+- 不影响导入与运行。
+- `pytest` 仍能全量通过。
+
 ## 运行测试
 
 本仓库的单元测试位于 `tests/`，**同时包含**：
@@ -48,6 +67,14 @@ python -m unittest
 - `tests/test_capture_relayout.py`：captures 按相机重排（并验证跳过事件记录）
 
 注意：采集相关（MVS SDK、相机硬件）不适合在 CI 环境跑，建议保持为“手工/现场验证项”。
+
+## tools/ 工具脚本与单测边界
+
+- 工具脚本统一放在 `tools/`（见 `tools/README.md`），用于一次性分析、调试与诊断。
+- 单元测试统一放在 `tests/`。
+- pytest 已在 `pyproject.toml` 中设置 `testpaths = ["tests"]`，避免把工具脚本误收集成单测。
+- 命名约定：不要在 `tools/` 下创建 `test_*.py` 或 `*_test.py`，避免与单测语义混淆。
+- 该约束由单测 `tests/test_repo_hygiene_tools_scripts.py` 强制检查，避免未来回归。
 
 ## 日志与可观测性建议
 

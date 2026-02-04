@@ -8,7 +8,7 @@
 - 采集主入口：`python -m mvs.apps.quad_capture`：支持 software/硬触发、master/slave、ROI、像素格式、曝光/增益，并写出 `metadata.jsonl` 供离线复盘。
 - 采集分析入口：`python -m mvs.apps.analyze_capture_run`：用于分析一次采集输出：组包完整性、丢包、FPS、时间差等。
 - `src/tennis3d/` 是业务库：检测器适配（fake/color/rknn）、标定读写、三角化与重投影误差、在线/离线共用 pipeline。
-- 在线入口：`python -m tennis3d.apps.online_mvs_localize`（实时取流→检测→三角化→输出 JSONL）。
+- 在线入口：`python -m tennis3d.apps.online`（实时取流→检测→三角化→输出 JSONL）。
 - 离线入口：`python -m tennis3d.apps.offline_localize_from_captures`（读 captures/metadata.jsonl→检测→三角化→输出 JSONL）。
 - 样例采集数据位于 `data/captures_master_slave/tennis_test/`（包含图片与 `metadata.jsonl`）。
 - 关键依赖：Python >= 3.10、numpy、opencv-python、pyyaml；RKNN 推理依赖运行时环境（通常不在 Windows 上直接可用）。
@@ -76,17 +76,17 @@ python -m mvs.apps.analyze_capture_run --output-dir data/captures_master_slave/t
 
 ### 在线 3D 定位
 
-- 入口：`src/tennis3d/apps/online_mvs_localize.py`
+- 入口：`src/tennis3d/apps/online/entry.py`（模块包：`src/tennis3d/apps/online/`）
 - 推荐运行方式：
 
 ```bash
-python -m tennis3d.apps.online_mvs_localize --help
+python -m tennis3d.apps.online --help
 ```
 
 也支持通过配置文件启动（YAML/JSON）：
 
 ```bash
-python -m tennis3d.apps.online_mvs_localize --config path/to/online.yaml
+python -m tennis3d.apps.online --config path/to/online.yaml
 ```
 
 核心参数：
@@ -167,13 +167,13 @@ python tools/tennis_localize_from_detections.py --help
 
 ## 代码结构（高内聚/低耦合）
 
-旧结构到新结构的对照表见：`docs/MIGRATION_MAP.md`。
+旧结构到新结构的对照表见：`docs/layout_migration.md`。
 
 > `mvs` 视为底层 SDK 封装层（src-layout：`src/mvs`），不建议随意重构；业务逻辑集中在 `tennis3d`（`src/tennis3d`）。
 
 - `src/mvs/`：工业相机采集封装（打开设备、抓流、分组、软触发、保存、像素格式转换等）
 - `src/tennis3d/apps/`：**应用入口层（CLI）**，尽量薄
-  - `online_mvs_localize.py`：在线取流并定位
+	- `online/`：在线取流并定位（`online/app.py` 为主入口）
   - `offline_localize_from_captures.py`：离线读取 captures 并定位
   - `detectors.py`：检测器适配（fake/rknn）
 - `src/tennis3d/pipeline/`：**在线/离线共享的流水线**
@@ -271,7 +271,7 @@ meta 字段因 source 不同而不同：
 
 ## 在线同步怎么做？（很关键）
 
-在线入口 `tennis3d.apps.online_mvs_localize` 通过 `mvs.pipeline.open_quad_capture` 获取“同步组”（按 `--group-by` 组包）。你需要选择合适的触发拓扑：
+在线入口 `tennis3d.apps.online` 通过 `mvs.pipeline.open_quad_capture` 获取“同步组”（按 `--group-by` 组包）。你需要选择合适的触发拓扑：
 
 ### A) 纯 Software 触发
 

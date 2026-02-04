@@ -69,6 +69,17 @@ htmlcov/
 *.swp
 *.swo
 
+# ---------- 仓库内临时输出 ----------
+# 说明：这些文件通常来自本地调试/一次性分析脚本，不应进入版本控制。
+output.txt
+temp/**/*.png
+temp/**/*.html
+temp/**/*.json
+temp/**/*.csv
+temp/**/*.npy
+temp/**/*.npz
+temp/**/__pycache__/
+
 # ---------- Jupyter ----------
 .ipynb_checkpoints/
 *.ipynb_checkpoints

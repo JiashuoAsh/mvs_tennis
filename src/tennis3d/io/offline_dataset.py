@@ -16,7 +16,7 @@ from typing import Any, Iterator
 
 import numpy as np
 
-from tennis3d.pipeline.sources import iter_capture_image_groups
+from tennis3d.pipeline import iter_capture_image_groups
 
 
 @dataclass(frozen=True)

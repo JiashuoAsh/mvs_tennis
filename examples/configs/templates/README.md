@@ -13,7 +13,7 @@
 
 - 离线入口：`src/tennis3d/apps/offline_localize_from_captures.py`
   - 支持：`--config path/to/offline.yaml`
-- 在线入口：`src/tennis3d/apps/online_mvs_localize.py`
+- 在线入口：`src/tennis3d/apps/online/entry.py`
   - 支持：`--config path/to/online.yaml`
 
 ## 模板清单

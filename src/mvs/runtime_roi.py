@@ -4,7 +4,7 @@
 
 设计目标：
 - 该模块只封装“GenICam int 节点”的读写与对齐逻辑；不涉及 Start/StopGrabbing。
-- 在部分机型上，OffsetX/OffsetY 在 StartGrabbing 后依然可写（你已实测）。
+- 在部分机型上，OffsetX/OffsetY 在 StartGrabbing 后依然可写（已实测）。
   但也可能失败（节点锁定/访问权限变化/固件差异）。因此这里提供 best-effort API：
   - 读取失败返回 None
   - 写入失败返回 (False, ret)

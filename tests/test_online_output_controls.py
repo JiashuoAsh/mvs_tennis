@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tennis3d.apps.online_mvs_localize import build_arg_parser
+from tennis3d.apps.online.cli import build_arg_parser
 from tennis3d.config import load_online_app_config
 
 

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from tennis3d.apps.online_mvs_localize import _format_all_balls_lines, _format_best_ball_line, _format_float3
+from tennis3d.apps.online.terminal_format import (
+    _format_all_balls_lines,
+    _format_best_ball_line,
+    _format_float3,
+)
 
 
 def test_format_float3() -> None:

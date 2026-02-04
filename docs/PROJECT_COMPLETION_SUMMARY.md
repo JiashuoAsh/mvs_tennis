@@ -100,7 +100,7 @@ python -m mvs.apps.quad_capture \
 ```bash
 python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 DA8199??? \
-  --trigger-source Line0 --trigger-activation RisingEdge \
+   --trigger-source Line0 --trigger-activation FallingEdge \
   --save-mode sdk-bmp --max-groups 1000
 ```
 

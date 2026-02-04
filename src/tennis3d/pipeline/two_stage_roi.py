@@ -12,7 +12,7 @@
   让检测结果逐帧回写到满幅坐标。
 
 本模块只实现控制逻辑，不负责加载 MVS binding。
-在线入口（tennis3d.apps.online_mvs_localize）会把相机句柄的 set_offset 方法注入进来。
+在线入口（tennis3d.apps.online）会把相机句柄的 set_offset 方法注入进来。
 """
 
 from __future__ import annotations

@@ -178,12 +178,12 @@ python -m mvs.apps.quad_capture \
 	--master-serial DA8199303 \
 	--master-line-source ExposureStartActive \
 	--trigger-source Line0 \
-	--trigger-activation RisingEdge \
+	--trigger-activation FallingEdge \
 	--exposure-auto Off --exposure-us 10000 \
 	--gain-auto Off --gain 15 \
 	--save-mode sdk-bmp \
 	--soft-trigger-fps 5 \
-	--max-groups 500 \
+	--max-groups 10 \
 	--max-wait-seconds 10 \
     --image-width 2448 \
 	--image-height 2048 \
@@ -201,7 +201,7 @@ python -m mvs.apps.quad_capture \
 补充排查（时间戳对不齐但组包完整）：
 
 - 如果你观察到 **master 与 slaves 的稳定时间差约等于曝光时间**（例如曝光 10ms 时差约 10ms；改成 2ms 时差约 2ms），通常是 **slaves 触发沿选反**。
-	- 处理方式：把 `--trigger-activation` 从 `RisingEdge` 切换为 `FallingEdge` 再采集验证。
+	- 处理方式：使用 `--trigger-activation FallingEdge` 再采集验证（如果你之前使用的是 `RisingEdge`，改为 `FallingEdge`）。
 	- 验证工具：`uv run python tools/debug_master_slave_timing.py --captures-dir <DIR> --master <MASTER_SERIAL>`
 	- 留档报告：`docs/reports/2026-02-03-master-slave-trigger-falling-edge.md`
 
@@ -216,7 +216,7 @@ python -m mvs.apps.quad_capture \
 	--master-serial DA8199303 \
 	--master-line-source ExposureStartActive \
 	--trigger-source Line0 \
-	--trigger-activation RisingEdge \
+	--trigger-activation FallingEdge \
 	# --exposure-auto Off --exposure-us 10000 \
 	--exposure-auto Off --exposure-us 2000 \
 	--gain-auto Off --gain 15 \
@@ -305,7 +305,7 @@ uv run python tools/mvs_runtime_roi_probe.py \
 在线两级 ROI 示例（相机 AOI=1280×1080，AOI 内再 software crop=640×640）：
 
 ```bash
-uv run python -m tennis3d.apps.online_mvs_localize \
+uv run python -m tennis3d.apps.online \
 	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
 	--trigger-source Software --soft-trigger-fps 30 \
 	--pixel-format BayerRG8 \
@@ -342,7 +342,7 @@ python -m mvs.apps.quad_capture \
 	--master-line-source ExposureStartActive \
 	--soft-trigger-fps 18 \
 	--trigger-source Line0 \
-	--trigger-activation RisingEdge \
+	--trigger-activation FallingEdge \
 	--exposure-auto Off --exposure-us 5000 \
 	--gain-auto Off --gain 12 \
 	--save-mode sdk-bmp \

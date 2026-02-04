@@ -64,7 +64,7 @@ python -m mvs.apps.quad_capture \
 python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 \
   --trigger-source Line0 \
-  --trigger-activation RisingEdge \
+  --trigger-activation FallingEdge \
   --save-mode sdk-bmp \
   --output-dir ./captures \
   --max-groups 100
@@ -79,7 +79,7 @@ python -m mvs.apps.quad_capture \
   --master-line-source ExposureStartActive \
   --soft-trigger-fps 15 \
   --trigger-source Line0 \
-  --trigger-activation RisingEdge \
+  --trigger-activation FallingEdge \
   --save-mode sdk-bmp \
   --output-dir ./captures_master_slave \
   --max-groups 20 \
@@ -245,7 +245,7 @@ with open_quad_capture(
     binding=binding,
     serials=["DA8199285", "DA8199303", "DA8199402"],
     trigger_sources=["Line0", "Line0", "Line0"],
-    trigger_activation="RisingEdge",
+  trigger_activation="FallingEdge",
     trigger_cache_enable=False,
     timeout_ms=1000,
     group_timeout_ms=1000,

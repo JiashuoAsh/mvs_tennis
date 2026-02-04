@@ -86,7 +86,7 @@ python -c "import os,re\nfrom pathlib import Path\npatterns=[\n  'tools' + '/' +
 需要检查的入口：
 - `python -m mvs.apps.quad_capture --help`
 - `python -m mvs.apps.analyze_capture_run --help`
-- `python -m tennis3d.apps.online_mvs_localize --help`
+- `python -m tennis3d.apps.online --help`
 - `python -m tennis3d.apps.offline_localize_from_captures --help`
 - `python -m tennis3d.apps.offline_detect --help`
 - `python -m tennis3d.apps.fake_calibration --help`

@@ -394,7 +394,7 @@ def configure_trigger(
         binding: 已加载的 MVS 绑定。
         cam: SDK 相机句柄（MvCamera 实例）。
         trigger_source: 触发源，例如 "Line0" / "Software"。
-        trigger_activation: 触发沿，例如 "RisingEdge"。
+        trigger_activation: 触发沿，例如 "FallingEdge"/"RisingEdge"。
         trigger_cache_enable: 是否启用触发缓存（部分机型不支持）。
 
     Raises:

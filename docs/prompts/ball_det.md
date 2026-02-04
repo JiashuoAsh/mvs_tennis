@@ -72,7 +72,7 @@ C) 可配置参数（放到 config，并在 CLI 暴露或配置文件中可控�
 
 D) 改造入口与文档
 - 更新 `src/tennis3d/pipeline/core.py::run_localization_pipeline()`：输出多球结构
-- 更新 offline_localize_from_captures.py、online_mvs_localize.py：确保运行不报错，输出符合新契约
+- 更新 offline_localize_from_captures.py、online/app.py：确保运行不报错，输出符合新契约
 - 更新文档 architecture-and-dataflow.md 中 3D 输出格式小节（简短但准确）
 
 E) 测试（必须写，且不能弱化现有测试）

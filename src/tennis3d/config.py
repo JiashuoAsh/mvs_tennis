@@ -287,7 +287,7 @@ class OnlineTriggerConfig:
     master_line_source: str = ""
     master_line_mode: str = "Output"
     soft_trigger_fps: float = 5.0
-    trigger_activation: str = "RisingEdge"
+    trigger_activation: str = "FallingEdge"
     trigger_cache_enable: bool = False
 
 
@@ -464,7 +464,7 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         master_line_source=str(trig.get("master_line_source", data.get("master_line_source", ""))).strip(),
         master_line_mode=str(trig.get("master_line_mode", data.get("master_line_mode", "Output"))).strip(),
         soft_trigger_fps=float(trig.get("soft_trigger_fps", data.get("soft_trigger_fps", 5.0))),
-        trigger_activation=str(trig.get("trigger_activation", data.get("trigger_activation", "RisingEdge"))).strip(),
+        trigger_activation=str(trig.get("trigger_activation", data.get("trigger_activation", "FallingEdge"))).strip(),
         trigger_cache_enable=bool(trig.get("trigger_cache_enable", data.get("trigger_cache_enable", False))),
     )
 

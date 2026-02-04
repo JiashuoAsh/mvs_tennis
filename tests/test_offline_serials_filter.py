@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 
 from tennis3d.config import load_offline_app_config
-from tennis3d.pipeline.sources import iter_capture_image_groups
+from tennis3d.pipeline import iter_capture_image_groups
 
 
 class TestIterCaptureImageGroupsSerialsFilter(unittest.TestCase):

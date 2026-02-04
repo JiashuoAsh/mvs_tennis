@@ -1,7 +1,7 @@
 ﻿# 在线 3D 定位配置（Windows/CPU，软件触发；使用你归档的四相机内外参）
 #
 # 用法示例（任选其一）：
-# - uv run python -m tennis3d.apps.online_mvs_localize --config configs/online_pt_windows_cpu_software_trigger_params_4cam.yaml
+# - uv run python -m tennis3d.apps.online --config configs/online_pt_windows_cpu_software_trigger_params_4cam.yaml
 # - tennis3d-online --config configs/online_pt_windows_cpu_software_trigger_params_4cam.yaml
 
 # SDK DLL 目录（按你的本机 SDK 安装位置调整；留空表示使用系统 PATH）

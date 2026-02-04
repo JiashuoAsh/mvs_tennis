@@ -18,7 +18,7 @@ import numpy as np
 from mvs.binding import MvsBinding
 from mvs.pipeline import QuadCapture
 
-from tennis3d.pipeline.sources import iter_mvs_image_groups
+from tennis3d.pipeline import iter_mvs_image_groups
 
 
 @dataclass(frozen=True)

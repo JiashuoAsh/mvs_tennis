@@ -36,7 +36,7 @@
 
 2) 在采集到的多相机图像上完成**网球检测 + 多球鲁棒三角化**，输出网球 3D 世界坐标（在线/离线均支持）：
 
-- 在线：`python -m tennis3d.apps.online_mvs_localize`（实时取流 → 检测 → 多球 3D → JSONL）
+- 在线：`python -m tennis3d.apps.online`（实时取流 → 检测 → 多球 3D → JSONL）
 - 离线：`python -m tennis3d.apps.offline_localize_from_captures`（读 captures/metadata.jsonl → 检测 → 多球 3D → JSONL）
 
 ### 核心挑战
@@ -65,7 +65,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                      应用层（CLI）                           │
 │  采集：python -m mvs.apps.quad_capture                         │
-│  在线 3D：python -m tennis3d.apps.online_mvs_localize          │
+│  在线 3D：python -m tennis3d.apps.online                       │
 │  离线 3D：python -m tennis3d.apps.offline_localize_from_captures│
 └────────────────────────┬────────────────────────────────────┘
                          │
@@ -317,7 +317,7 @@ finally:
 
 ### 入口（apps）
 
-- 在线：`src/tennis3d/apps/online_mvs_localize.py`
+- 在线：`src/tennis3d/apps/online/entry.py`
   - 从 `mvs.pipeline.open_quad_capture()` 实时取流并组包
   - 调用 `tennis3d.pipeline.iter_mvs_image_groups()` 转为 `images_by_camera`
   - 调用 `tennis3d.pipeline.run_localization_pipeline()` 输出 JSONL
@@ -572,7 +572,7 @@ python -m mvs.apps.quad_capture \
 python -m mvs.apps.quad_capture \
   --serial DA8199285 DA8199303 DA8199402 DA8199??? \
   --trigger-source Line0 \
-  --trigger-activation RisingEdge \
+  --trigger-activation FallingEdge \
   --save-mode sdk-bmp \
   --max-groups 1000
 ```
@@ -598,7 +598,7 @@ python -m tennis3d.apps.offline_localize_from_captures --config configs/offline_
 #### 在线：实时取流 → 检测 → 多球定位 → JSONL
 
 ```bash
-python -m tennis3d.apps.online_mvs_localize --config configs/online_pt_windows_cpu_software_trigger.yaml
+python -m tennis3d.apps.online --config configs/online_pt_windows_cpu_software_trigger.yaml
 ```
 
 在线模式会通过 `mvs` 打开相机、分组，然后对每个同步组输出一行 JSONL（包含 `balls`）。
@@ -864,8 +864,8 @@ MVS_Deployment/
 
 #### TriggerActivation（触发沿）
 
-- `RisingEdge`：上升沿（常用）
-- `FallingEdge`：下降沿
+- `FallingEdge`：下降沿（本仓库默认）
+- `RisingEdge`：上升沿
 - `LevelHigh`/`LevelLow`：电平
 
 #### PixelType（像素格式，示例）
