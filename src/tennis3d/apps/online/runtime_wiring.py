@@ -13,8 +13,7 @@
 
 from __future__ import annotations
 
-from mvs import load_mvs_binding
-from mvs.triggering import TriggerPlan, build_trigger_plan
+from mvs import TriggerPlan, build_trigger_plan, load_mvs_binding
 
 from tennis3d.detectors import create_detector
 from tennis3d.geometry.calibration import apply_sensor_roi_to_calibration, load_calibration

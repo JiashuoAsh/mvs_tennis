@@ -271,7 +271,7 @@ meta 字段因 source 不同而不同：
 
 ## 在线同步怎么做？（很关键）
 
-在线入口 `tennis3d.apps.online` 通过 `mvs.pipeline.open_quad_capture` 获取“同步组”（按 `--group-by` 组包）。你需要选择合适的触发拓扑：
+在线入口 `tennis3d.apps.online` 通过 `mvs.open_quad_capture` 获取“同步组”（按 `--group-by` 组包）。你需要选择合适的触发拓扑：
 
 ### A) 纯 Software 触发
 

@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from mvs.metadata_io import iter_metadata_records
+from .metadata_io import iter_metadata_records
 
 
 @dataclass(frozen=True, slots=True)

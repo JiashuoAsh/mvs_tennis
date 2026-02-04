@@ -72,3 +72,38 @@
 
 - 运行 offline/online 后，输出 jsonl 中能看到 `balls` 字段；当检测到球时 `balls` 非空。
 
+5) 相机侧 ROI（硬件裁剪）与像素格式
+
+在线（online）配置支持相机图像参数（字段来自 `src/tennis3d/config.py`，并会下发到 MVS SDK）：
+
+- `pixel_format`：留空表示不设置（沿用相机当前配置）。常见可填：`Mono8`、`BayerRG8`、`BayerBG8` 等。
+- `image_width` + `image_height`：相机输出 ROI 的宽高（必须同时设置；只写一个会报错）。
+- `image_offset_x` + `image_offset_y`：ROI 左上角偏移。
+
+注意：
+
+- 这里的 ROI 是“裁剪”，不是缩放；能显著降低带宽与 CPU 压力，但视场会变小。
+- 多数机型对 Width/Height/Offset 有步进（Inc）限制，不对齐时 SDK 会失败或被自动对齐。
+
+6) 相机侧 AOI（运行中动态 OffsetX/OffsetY）
+
+在线（online）支持启用“相机侧 AOI 运行中平移”，配置字段为：
+
+- `camera_aoi_runtime: true`：开启动态 AOI。
+- `camera_aoi_update_every_groups`：每隔 N 个 group 才尝试更新一次（>=1）。
+- `camera_aoi_min_move_px`：小于该像素变化不更新（减少抖动与写节点频率）。
+- `camera_aoi_smooth_alpha`：平滑系数 $\in[0,1]$，越大越稳但跟随更慢。
+- `camera_aoi_max_step_px`：单次最大移动像素（限速）。
+- `camera_aoi_recenter_after_missed`：连续无球后逐步回到初始 offset（0 表示禁用）。
+
+使用建议：
+
+1) 先设置一个“足够大、不易丢球”的固定相机 ROI（`image_width/image_height`），用于降带宽。
+2) 再启用 `camera_aoi_runtime`，让窗口跟随球移动，进一步降带宽。
+3) 如需进一步提速，可叠加 `detector_crop_size` 做 AOI 内的软件裁剪（降推理算力）。
+
+注意：
+
+- 不是所有机型都支持在取流中写 OffsetX/OffsetY；不支持时写入会失败，窗口不会移动。
+- 启用动态 AOI 时，不应做一次性的标定主点平移；本仓库会在 `camera_aoi_runtime=true` 时自动跳过该步骤。
+

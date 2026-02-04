@@ -17,10 +17,11 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
 
-from mvs.binding import MvsBinding
-from mvs.events import MvsEvent
-from mvs._cleanup import best_effort
-from mvs.text import decode_c_string
+from mvs.core._cleanup import best_effort
+from mvs.core.events import MvsEvent
+from mvs.core.text import decode_c_string
+
+from .binding import MvsBinding
 
 
 class MvsError(RuntimeError):

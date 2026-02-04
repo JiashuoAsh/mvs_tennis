@@ -13,7 +13,7 @@ import threading
 import time
 from typing import Any, Optional, Sequence, Tuple
 
-from mvs.events import MvsEvent
+from mvs.core.events import MvsEvent
 
 
 class SoftwareTriggerLoop(threading.Thread):

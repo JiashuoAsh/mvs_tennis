@@ -17,10 +17,8 @@ from typing import Any, Iterator
 
 import numpy as np
 
-from mvs.binding import MvsBinding
-from mvs.image import frame_to_bgr
-from mvs.pipeline import QuadCapture
-from mvs.time_mapping import OnlineDevToHostMapper
+from mvs import MvsBinding, OnlineDevToHostMapper, QuadCapture
+from mvs.capture.image import frame_to_bgr
 
 from .time_utils import (
     delta_to_median_by_camera,

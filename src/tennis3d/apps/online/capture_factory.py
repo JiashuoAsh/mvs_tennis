@@ -1,7 +1,7 @@
 """在线模式：打开多相机采集（open_quad_capture 的 spec 适配层）。
 
 职责：
-- 把 `OnlineRunSpec` + `TriggerPlan` 映射为 `mvs.pipeline.open_quad_capture` 的参数。
+- 把 `OnlineRunSpec` + `TriggerPlan` 映射为 `mvs.open_quad_capture` 的参数。
 
 说明：
 - 该模块属于 entry 层：负责把“运行规格”翻译成“硬件调用参数”。
@@ -12,8 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mvs.pipeline import open_quad_capture
-from mvs.triggering import TriggerPlan
+from mvs import TriggerPlan, open_quad_capture
 
 from .spec import OnlineRunSpec
 
@@ -43,8 +42,10 @@ def open_online_quad_capture(*, binding: Any, spec: OnlineRunSpec, plan: Trigger
         image_height=(int(spec.image_height) if spec.image_height is not None else None),
         image_offset_x=int(spec.image_offset_x),
         image_offset_y=int(spec.image_offset_y),
-        exposure_auto="Off",
-        exposure_time_us=10000.0,
-        gain_auto="Off",
-        gain=12.0,
+        exposure_auto=str(spec.exposure_auto),
+        exposure_time_us=(
+            float(spec.exposure_time_us) if spec.exposure_time_us is not None else None
+        ),
+        gain_auto=str(spec.gain_auto),
+        gain=(float(spec.gain) if spec.gain is not None else None),
     )

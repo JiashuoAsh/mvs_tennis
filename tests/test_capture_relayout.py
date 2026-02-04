@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from mvs.capture_relayout import relayout_capture_by_camera
+from mvs.session.capture_relayout import relayout_capture_by_camera
 
 
 class TestCaptureRelayout(unittest.TestCase):

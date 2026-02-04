@@ -17,8 +17,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 
-from mvs.binding import MvsBinding
-from mvs.text import decode_c_string
+from mvs.core.text import decode_c_string
+from mvs.sdk.binding import MvsBinding
 
 
 @dataclass(frozen=True, slots=True)

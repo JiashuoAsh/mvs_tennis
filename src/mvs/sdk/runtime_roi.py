@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 
-from mvs.binding import MvsBinding
+from .binding import MvsBinding
 
 
 @dataclass(frozen=True)

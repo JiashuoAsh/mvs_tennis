@@ -318,7 +318,7 @@ finally:
 ### 入口（apps）
 
 - 在线：`src/tennis3d/apps/online/entry.py`
-  - 从 `mvs.pipeline.open_quad_capture()` 实时取流并组包
+  - 从 `mvs.open_quad_capture()` 实时取流并组包
   - 调用 `tennis3d.pipeline.iter_mvs_image_groups()` 转为 `images_by_camera`
   - 调用 `tennis3d.pipeline.run_localization_pipeline()` 输出 JSONL
 
@@ -624,7 +624,7 @@ pytest -q
 
 ### API 速查（mvs）
 
-### mvs.binding
+### mvs.load_mvs_binding
 
 ```python
 def load_mvs_binding(*, dll_dir: Optional[str] = None) -> MvsBinding:
@@ -641,7 +641,7 @@ def load_mvs_binding(*, dll_dir: Optional[str] = None) -> MvsBinding:
     """
 ```
 
-### mvs.devices
+### mvs.enumerate_devices
 
 ```python
 def enumerate_devices(binding: Any) -> Tuple[Any, List[DeviceDesc]]:
@@ -657,7 +657,7 @@ def enumerate_devices(binding: Any) -> Tuple[Any, List[DeviceDesc]]:
     """
 ```
 
-### mvs.camera
+### mvs.MvsCamera / mvs.MvsSdk
 
 ```python
 class MvsCamera:
@@ -687,7 +687,7 @@ class MvsSdk:
         """SDK 反初始化。"""
 ```
 
-### mvs.pipeline
+### mvs.open_quad_capture / mvs.QuadCapture
 
 ```python
 def open_quad_capture(
@@ -715,7 +715,7 @@ class QuadCapture:
     def __exit__(self, exc_type, exc, tb) -> None: ...
 ```
 
-### mvs.save
+### mvs.save_frame_as_bmp
 
 ```python
 def save_frame_as_bmp(

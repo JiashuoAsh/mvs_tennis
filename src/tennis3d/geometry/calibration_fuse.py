@@ -5,7 +5,7 @@
   - 内参：形如 <SERIAL>_intrinsics.json（camera_matrix/dist_coeffs/image_size）
   - 外参：base_to_camera_extrinsics.json（C_T_B: Base->Cam 的 4x4 齐次矩阵）
 - 输出：
-  - 与 data/calibration/params_4cam_calib.json 相同 schema 的 JSON（顶层 cameras，且每个相机包含 image_size/K/dist/R_wc/t_wc）
+    - 与 data/calibration/camera_extrinsics_C_T_B.json 相同 schema 的 JSON（顶层 cameras，且每个相机包含 image_size/K/dist/R_wc/t_wc）
 
 约定：
 - 外参方向为 world->camera：X_c = R_wc X_w + t_wc。
@@ -130,7 +130,9 @@ def build_params_calib_json(
     version: int = 1,
     notes: str | None = None,
 ) -> dict[str, Any]:
-    """生成 params_4cam_calib 风格 JSON（返回 dict，不负责写文件）。
+    """生成融合标定 JSON（返回 dict，不负责写文件）。
+
+    当前仓库约定的标准落盘文件名为 data/calibration/camera_extrinsics_C_T_B.json。
 
     Args:
         intrinsics_by_name: key 为相机名（通常是 serial）。

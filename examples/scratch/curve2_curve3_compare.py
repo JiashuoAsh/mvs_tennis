@@ -16,10 +16,10 @@
 
 运行示例：
     # 1) 直接把整个 jsonl 当作“一球轨迹”来拟合（不按 track_id 过滤，推荐）
-    uv run python temp/curve2_curve3_compare.py --jsonl "data/tools_output/online points.jsonl"
+    uv run python examples/scratch/curve2_curve3_compare.py --jsonl "data/tools_output/online points.jsonl"
 
     # 2) 如果你的 jsonl 确实包含多条轨迹，也可以指定 track_id
-    uv run python temp/curve2_curve3_compare.py --jsonl data/tools_output/online_positions_3d.master_slave.jsonl --track-id 1
+    uv run python examples/scratch/curve2_curve3_compare.py --jsonl data/tools_output/online_positions_3d.master_slave.jsonl --track-id 1
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from curve.curve_v2.curve2 import Curve as CurveV2
 from curve.curve_v3.config import CurveV3Config
 from curve.curve_v3.core import CurvePredictorV3
 from curve.curve_v3.types import BallObservation
-from mvs.metadata_io import iter_metadata_records
+from mvs.session.metadata_io import iter_metadata_records
 
 
 @dataclass(frozen=True)

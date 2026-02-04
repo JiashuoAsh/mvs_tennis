@@ -18,7 +18,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from mvs.capture_relayout import relayout_capture_by_camera
+from mvs.session.capture_relayout import relayout_capture_by_camera
 
 
 def _build_parser() -> argparse.ArgumentParser:

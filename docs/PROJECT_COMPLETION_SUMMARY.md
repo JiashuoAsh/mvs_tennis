@@ -11,7 +11,7 @@
 
 | 交付物 | 说明 | 状态 |
 |--------|------|------|
-| **mvs 包** | 9 个模块（binding/camera/devices/grab/grouping/soft_trigger/save/pipeline + __init__） | ✅ 完成 |
+| **mvs 包** | 子包拆分（core/sdk/capture/session/analysis/apps + `mvs.__init__` 公共导出） | ✅ 完成 |
 | **CLI 工具** | `python -m mvs.apps.quad_capture` 采集入口（位于 `src/mvs/apps/quad_capture.py`） | ✅ 完成 |
 | **文档** | docs/ 下的完整项目文档 + mvs/README.md 包文档 | ✅ 完成 |
 | **示例** | examples/quad_capture_demo.py 最小可运行示例 | ✅ 完成 |
@@ -43,18 +43,18 @@
 ### 2. 模块化与复用
 
 ```python
-# 业务层可直接调用
+# 业务层可直接调用（推荐：稳定公共导出）
 from mvs import (
-    load_mvs_binding,
-    MvsSdk,
-    open_quad_capture,
-    save_frame_as_bmp,
-    enumerate_devices,
+   FramePacket,
+   Grabber,
+   MvsCamera,
+   MvsSdk,
+   configure_trigger,
+   enumerate_devices,
+   load_mvs_binding,
+   open_quad_capture,
+   save_frame_as_bmp,
 )
-
-# 或低级调用
-from mvs.camera import MvsCamera, configure_trigger
-from mvs.grab import Grabber, FramePacket
 ```
 
 ### 3. 上下文管理

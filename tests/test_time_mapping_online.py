@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import unittest
 
-from mvs.time_mapping import OnlineDevToHostMapper
+from mvs import OnlineDevToHostMapper
 
 
 class TestOnlineDevToHostMapper(unittest.TestCase):

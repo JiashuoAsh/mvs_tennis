@@ -7,7 +7,7 @@
 
 边界：
 - 该模块不做任何 SDK 操作，不做任何文件 I/O，也不打印日志。
-- 需要执行“落盘采集”的实现请使用 `mvs.capture_session_recording`。
+- 需要执行“落盘采集”的实现请使用 `mvs.run_capture_session()`（见 `mvs.session.capture_session_recording`）。
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from mvs.triggering import TriggerPlan
+from mvs.capture.triggering import TriggerPlan
 
 
 GroupBy = Literal["trigger_index", "frame_num", "sequence"]

@@ -133,7 +133,7 @@ def run_localization_pipeline(
             if img is None:
                 continue
 
-            # 可选：软件裁剪（动态 ROI）以降低 detector 输入尺寸。
+            # Optional：软件裁剪（动态 ROI）以降低 detector 输入尺寸。
             # 注意：裁剪坐标系下的 bbox 需要加回 offset 才能保持下游几何一致。
             img_for_det = img
             offset_xy = (0, 0)

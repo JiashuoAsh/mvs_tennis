@@ -49,6 +49,12 @@ model: data/models/best.pt
 # 软件裁剪（动态 ROI，可选）：在 detector 前裁剪小窗口以提高吞吐。
 # - detector_crop_size=0 表示关闭（默认）。
 # - 若启用：建议先确保“整幅（或相机 ROI）”里能稳定检测到第一颗球；锁定后再由动态裁剪跟随。
+
+# 曝光/增益：默认保持旧行为（关闭 Auto + 固定参数）。
+exposure_auto: Off
+exposure_time_us: 10000.0
+gain_auto: Off
+gain: 12.0
 # detector_crop_size: 640
 # detector_crop_smooth_alpha: 0.2
 # detector_crop_max_step_px: 120

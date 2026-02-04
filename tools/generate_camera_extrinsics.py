@@ -1,6 +1,6 @@
 """生成符合 tennis3d.geometry.calibration.load_calibration() 的标定 JSON。
 
-输出格式参考：data/calibration/params_4cam_calib.json
+输出格式参考：data/calibration/camera_extrinsics_C_T_B.json
 
 典型用法（示例）：
 - 已有内参目录（*_intrinsics.json）
@@ -54,7 +54,7 @@ def _parse_map(items: list[str]) -> dict[str, str]:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="融合内参与外参，生成 load_calibration 可读取的标定 JSON（params_4cam_calib 风格）"
+        description="融合内参与外参，生成 load_calibration 可读取的标定 JSON（camera_extrinsics_C_T_B 风格）"
     )
 
     parser.add_argument(

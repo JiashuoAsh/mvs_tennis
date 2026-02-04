@@ -1,4 +1,4 @@
-"""mvs.camera.configure_resolution 的回归测试。
+"""mvs.configure_resolution 的回归测试。
 
 该测试不依赖真实相机或 MVS SDK，通过 fake cam/binding 模拟：
 - 初始 OffsetX/OffsetY 非零会导致 WidthMax/HeightMax 被缩小；
@@ -12,7 +12,7 @@ from typing import Any, cast
 
 import pytest
 
-from mvs.camera import configure_resolution
+from mvs import configure_resolution
 
 
 class _FakeParams:

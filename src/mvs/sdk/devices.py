@@ -14,8 +14,9 @@ import ctypes
 from dataclasses import dataclass
 from typing import Any, Iterable, List, Optional
 
-from mvs.binding import MvsBinding
-from mvs.text import decode_c_string
+from mvs.core.text import decode_c_string
+
+from .binding import MvsBinding
 
 
 def _bytes_to_str(buf: Iterable[int]) -> str:

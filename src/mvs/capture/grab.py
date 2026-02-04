@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from mvs.binding import MvsBinding
+from mvs.sdk.binding import MvsBinding
 
 
 @dataclass(frozen=True, slots=True)

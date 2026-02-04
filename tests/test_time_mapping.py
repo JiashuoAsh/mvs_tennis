@@ -15,7 +15,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from mvs.time_mapping import collect_frame_pairs_from_metadata, fit_dev_to_host_ms, save_time_mappings_json
+from mvs import collect_frame_pairs_from_metadata, fit_dev_to_host_ms, save_time_mappings_json
 from tennis3d.pipeline import iter_capture_image_groups
 
 

@@ -7,7 +7,7 @@
 - 尤其关注 OffsetX/OffsetY 的运行时可写性（动态平移 ROI）。
 
 背景（来自本仓库的工程经验）：
-- `src/mvs/camera.py:configure_resolution()` 与 `configure_pixel_format()` 都明确建议：
+- `src/mvs/sdk/camera.py:configure_resolution()` 与 `configure_pixel_format()` 都明确建议：
   “建议在 StartGrabbing 之前设置（采集开始后很多节点会被锁定为不可写）”。
 - 但“建议”不等于“绝对不行”：具体是否可写，取决于机型/固件/当前模式（触发/连续采集）等。
 
@@ -36,17 +36,14 @@ import statistics
 import time
 from collections import Counter
 
-from mvs.binding import load_mvs_binding
-from mvs.camera import MvsCamera, MvsSdk
-from mvs.devices import enumerate_devices
-from mvs.soft_trigger import SoftwareTriggerLoop
+from mvs import MvsCamera, MvsSdk, SoftwareTriggerLoop, enumerate_devices, load_mvs_binding
 
 
 def _get_int_node_info(*, binding, cam, key: str) -> tuple[int, int, int, int] | None:
     """读取 int 节点的当前值/最小/最大/步进。
 
     说明：
-        - 这里重复实现一份轻量 helper，避免在工具脚本中依赖 `mvs.camera` 的私有函数。
+        - 这里重复实现一份轻量 helper，避免在工具脚本中依赖 `mvs.sdk.camera` 的私有函数。
     """
 
     try:

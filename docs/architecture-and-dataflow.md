@@ -12,7 +12,7 @@
 ### 采集与诊断（mvs）
 
 - 采集主入口：`python -m mvs.apps.quad_capture`
-  - 调用：`mvs.load_mvs_binding()` → `mvs.pipeline.open_quad_capture()` → `mvs.capture_session.run_capture_session()`
+  - 调用：`mvs.load_mvs_binding()` → `mvs.open_quad_capture()` → `mvs.run_capture_session()`
   - 输出：
     - 图片（可选）：`--save-mode sdk-bmp|raw|none`
     - 元数据：`<output_dir>/metadata.jsonl`
@@ -29,7 +29,7 @@
 
 - 在线定位：`python -m tennis3d.apps.online`
   - 调用链：
-    - `mvs.pipeline.open_quad_capture()` 打开相机与组包
+    - `mvs.open_quad_capture()` 打开相机与组包
     - `tennis3d.pipeline.iter_mvs_image_groups()` 把 `FramePacket` 转为 OpenCV BGR 图
     - `tennis3d.detectors.create_detector()` 选择 fake/color/rknn
     - `tennis3d.pipeline.run_localization_pipeline()`：detect → `tennis3d.localization.localize_balls()` → 输出 JSONL

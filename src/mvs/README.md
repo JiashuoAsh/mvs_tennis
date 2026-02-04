@@ -207,7 +207,7 @@ $$group\_key = (value - base) \& 0xFFFFFFFF$$
 ### 3) master 的输出线模式不叫 Output（叫 Strobe）
 
 不同机型的 `LineMode` 枚举值可能不同：有的机型 `Output` 会失败，需要 `Strobe`。
-本包在 `mvs/camera.py::configure_line_output()` 里做了 Output/Strobe 候选尝试，但你仍需要：
+本包在 `mvs/sdk/camera.py::configure_line_output()` 里做了 Output/Strobe 候选尝试，但你仍需要：
 
 - 在 MVS Client 里确认可选值
 - 必要时命令行传 `--master-line-mode Strobe`
@@ -234,7 +234,7 @@ $$group\_key = (value - base) \& 0xFFFFFFFF$$
 
 ## 作为库使用：核心 API 入口
 
-你可以直接用 `mvs.pipeline.open_quad_capture()` 得到 `QuadCapture`：
+你可以直接用 `mvs.open_quad_capture()` 得到 `QuadCapture`：
 
 ```python
 from mvs import open_quad_capture, load_mvs_binding

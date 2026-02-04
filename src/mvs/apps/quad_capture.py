@@ -14,7 +14,7 @@
 
 本模块定位：
 - entry layer（CLI 入口），负责参数解析与依赖组装。
-- 可复用的核心采集能力由 `mvs.pipeline.open_quad_capture` 等模块提供。
+- 可复用的核心采集能力由 `mvs.open_quad_capture` 等 API 提供。
 """
 
 from __future__ import annotations
@@ -25,13 +25,13 @@ from pathlib import Path
 from typing import Literal, Optional, Sequence, cast
 
 from mvs import MvsDllNotFoundError, load_mvs_binding
-from mvs.camera import MvsSdk
-from mvs.capture_session_recording import run_capture_session
-from mvs.capture_session_types import CaptureSessionConfig, GroupBy, SaveMode
-from mvs.triggering import build_trigger_plan
-from mvs.devices import enumerate_devices
-from mvs.paths import repo_root
-from mvs.roi import normalize_roi
+from mvs.core.paths import repo_root
+from mvs.core.roi import normalize_roi
+from mvs.sdk.camera import MvsSdk
+from mvs.sdk.devices import enumerate_devices
+from mvs.capture.triggering import build_trigger_plan
+from mvs.session.capture_session_recording import run_capture_session
+from mvs.session.capture_session_types import CaptureSessionConfig, GroupBy, SaveMode
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

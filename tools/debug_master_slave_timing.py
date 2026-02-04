@@ -42,8 +42,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from mvs.metadata_io import iter_metadata_records
-from mvs.time_mapping import LinearTimeMapping, load_time_mappings_json
+from mvs import LinearTimeMapping, load_time_mappings_json
+from mvs.session.metadata_io import iter_metadata_records
 from tennis3d.pipeline.time_utils import host_timestamp_to_ms_epoch, median_float
 
 

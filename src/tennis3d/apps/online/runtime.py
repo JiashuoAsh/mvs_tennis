@@ -5,7 +5,7 @@
 - 打开多相机取流与组包
 - 组装 ROI 控制器
 - 调用核心 pipeline（detect -> triangulate）
-- 可选写 JSONL 与终端打印
+- Optional写 JSONL 与终端打印
 
 说明：
 - 该模块属于 entry 层，可依赖 mvs/tennis3d 的 core，但 core 不应反向依赖它。
@@ -94,7 +94,7 @@ def run_online(spec: OnlineRunSpec) -> int:
                     roi_controller=roi_controller,
                 )
 
-                # 可选：对 3D 输出做轨迹拟合增强（落点/落地时间/走廊）。
+                # Optional：对 3D 输出做轨迹拟合增强（落点/落地时间/走廊）。
                 records = apply_curve_stage(records, spec.curve_cfg)
 
                 def _get_groups_done() -> int:

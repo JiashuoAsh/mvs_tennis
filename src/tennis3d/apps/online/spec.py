@@ -16,7 +16,7 @@ from typing import Any, Literal, Sequence, cast
 from tennis3d.config import OnlineAppConfig
 from tennis3d.trajectory import CurveStageConfig
 
-from mvs.roi import normalize_roi
+from mvs import normalize_roi
 
 from .cli import _TERMINAL_PRINT_MODE
 
@@ -72,6 +72,10 @@ class OnlineRunSpec:
         image_height: 相机 ROI 高（None 表示不设置）。
         image_offset_x: 相机 ROI 偏移 X。
         image_offset_y: 相机 ROI 偏移 Y。
+        exposure_auto: 自动曝光模式（空字符串表示不设置）。
+        exposure_time_us: 曝光时间（微秒；None 表示不设置）。
+        gain_auto: 自动增益模式（空字符串表示不设置）。
+        gain: 增益（None 表示不设置）。
         time_sync_mode: 时间轴模式。
         time_mapping_warmup_groups: 在线映射 warmup 组数。
         time_mapping_window_groups: 在线映射滑窗组数。
@@ -139,6 +143,11 @@ class OnlineRunSpec:
     image_offset_x: int
     image_offset_y: int
 
+    exposure_auto: str
+    exposure_time_us: float | None
+    gain_auto: str
+    gain: float | None
+
     time_sync_mode: str
     time_mapping_warmup_groups: int
     time_mapping_window_groups: int
@@ -202,6 +211,11 @@ class OnlineRunSpec:
         if self.master_serial and self.master_serial not in self.serials:
             raise ValueError("--master-serial must be one of the provided --serial values.")
 
+        if self.exposure_time_us is not None and float(self.exposure_time_us) <= 0:
+            raise ValueError("exposure_time_us must be > 0 (or None to disable)")
+        if self.gain is not None and float(self.gain) < 0:
+            raise ValueError("gain must be >= 0 (or None to disable)")
+
 
 def build_spec_from_config(cfg: OnlineAppConfig) -> OnlineRunSpec:
     """从在线配置文件构建运行规格。"""
@@ -250,6 +264,18 @@ def build_spec_from_config(cfg: OnlineAppConfig) -> OnlineRunSpec:
         image_height=getattr(cfg, "image_height", None),
         image_offset_x=int(getattr(cfg, "image_offset_x", 0)),
         image_offset_y=int(getattr(cfg, "image_offset_y", 0)),
+        exposure_auto=str(getattr(cfg, "exposure_auto", "Off") if cfg is not None else "Off"),
+        exposure_time_us=(
+            float(getattr(cfg, "exposure_time_us", 10000.0))
+            if getattr(cfg, "exposure_time_us", 10000.0) is not None
+            else None
+        ),
+        gain_auto=str(getattr(cfg, "gain_auto", "Off") if cfg is not None else "Off"),
+        gain=(
+            float(getattr(cfg, "gain", 12.0))
+            if getattr(cfg, "gain", 12.0) is not None
+            else None
+        ),
         time_sync_mode=str(cfg.time_sync_mode),
         time_mapping_warmup_groups=int(cfg.time_mapping_warmup_groups),
         time_mapping_window_groups=int(cfg.time_mapping_window_groups),
@@ -344,6 +370,18 @@ def build_spec_from_args(args: Any) -> OnlineRunSpec:
         image_height=image_height,
         image_offset_x=int(image_offset_x),
         image_offset_y=int(image_offset_y),
+        exposure_auto=str(getattr(args, "exposure_auto", "Off") if args is not None else "Off"),
+        exposure_time_us=(
+            float(getattr(args, "exposure_time_us", 10000.0))
+            if getattr(args, "exposure_time_us", 10000.0) is not None
+            else None
+        ),
+        gain_auto=str(getattr(args, "gain_auto", "Off") if args is not None else "Off"),
+        gain=(
+            float(getattr(args, "gain", 12.0))
+            if getattr(args, "gain", 12.0) is not None
+            else None
+        ),
         time_sync_mode=str(getattr(args, "time_sync_mode")),
         time_mapping_warmup_groups=int(getattr(args, "time_mapping_warmup_groups")),
         time_mapping_window_groups=int(getattr(args, "time_mapping_window_groups")),

@@ -40,6 +40,29 @@ group_timeout_ms: 1000
 max_pending_groups: 256
 max_groups: 0
 
+# 可选：相机图像参数（会传给 SDK）。
+# - pixel_format 为空表示不设置（沿用相机当前配置）。
+# - image_width/image_height 必须同时设置；不设置就留空或删除。
+#
+# 说明：这里的 ROI 是“相机侧裁剪”（改变相机输出宽高/偏移），不是缩放。
+pixel_format: ""
+# image_width: 1920
+# image_height: 1080
+# image_offset_x: 0
+# image_offset_y: 0
+
+# 可选：曝光/增益（会在 StartGrabbing 前下发到相机）。
+# 默认保持旧行为：关闭 Auto，并设置固定曝光/增益。
+# - 若想完全不干预曝光/增益，可显式设置：
+#   exposure_auto: ""
+#   exposure_time_us: null
+#   gain_auto: ""
+#   gain: null
+exposure_auto: Off
+exposure_time_us: 10000.0
+gain_auto: Off
+gain: 12.0
+
 # 标定文件
 calib: data/calibration/example_triple_camera_calib.json
 
@@ -47,6 +70,29 @@ calib: data/calibration/example_triple_camera_calib.json
 # 默认 detector=fake（只用于链路/冒烟）。真实使用通常会改成 pt，并填写 model 路径。
 detector: fake
 model: ""
+
+# 软件裁剪（动态 ROI，可选）：在 detector 前裁剪小窗口以提高吞吐。
+# - detector_crop_size=0 表示关闭（默认）。
+# - bbox 会自动加回 offset，保证下游仍使用原图像素坐标系。
+# detector_crop_size: 640
+# detector_crop_smooth_alpha: 0.2
+# detector_crop_max_step_px: 120
+# detector_crop_reset_after_missed: 8
+
+# 相机侧 AOI（可选，进阶）：运行中动态平移 OffsetX/OffsetY。
+#
+# 典型用法：
+# 1) 先设置 image_width/image_height（固定窗口尺寸）并给一个合理的初始 offset
+# 2) 再启用 camera_aoi_runtime 让窗口跟随球移动（降带宽）
+# 3) 如需进一步提速，可叠加上面的 detector_crop_size（在 AOI 内二次软件裁剪）
+#
+# 注意：需要机型支持在取流中写 OffsetX/OffsetY；不支持时写入会失败，窗口不会移动。
+# camera_aoi_runtime: true
+# camera_aoi_update_every_groups: 2
+# camera_aoi_min_move_px: 8
+# camera_aoi_smooth_alpha: 0.3
+# camera_aoi_max_step_px: 160
+# camera_aoi_recenter_after_missed: 30
 
 min_score: 0.25
 require_views: 2

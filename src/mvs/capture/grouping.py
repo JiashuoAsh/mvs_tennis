@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional
 
-from mvs.grab import FramePacket
+from .grab import FramePacket
 
 
 @dataclass

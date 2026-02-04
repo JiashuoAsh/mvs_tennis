@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from tennis3d.apps.online.cli import build_arg_parser
+from tennis3d.apps.online.spec import build_spec_from_config
 from tennis3d.config import load_online_app_config
 
 
@@ -49,6 +50,10 @@ def test_load_online_app_config_supports_output_controls(tmp_path: Path) -> None
                 "dll_dir": "",
                 "serials": ["A", "B"],
                 "calib": "data/calibration/example_triple_camera_calib.json",
+                "exposure_auto": "Off",
+                "exposure_time_us": 8000.0,
+                "gain_auto": "Off",
+                "gain": 6.0,
                 "pt_device": "cuda:0",
                 "terminal_print_mode": "none",
                 "terminal_status_interval_s": 1.0,
@@ -76,3 +81,15 @@ def test_load_online_app_config_supports_output_controls(tmp_path: Path) -> None
     assert cfg.out_jsonl_only_when_balls is True
     assert cfg.out_jsonl_flush_every_records == 10
     assert cfg.out_jsonl_flush_interval_s == 0.5
+
+    assert cfg.exposure_auto == "Off"
+    assert float(cfg.exposure_time_us or 0.0) == 8000.0
+    assert cfg.gain_auto == "Off"
+    assert float(cfg.gain or 0.0) == 6.0
+
+    # 说明：spec 是 entry 与 runtime 的稳定边界；这里验证映射不会丢字段。
+    spec = build_spec_from_config(cfg)
+    assert spec.exposure_auto == "Off"
+    assert float(spec.exposure_time_us or 0.0) == 8000.0
+    assert spec.gain_auto == "Off"
+    assert float(spec.gain or 0.0) == 6.0

@@ -88,6 +88,22 @@ def _as_int(x: Any, default: int = 0) -> int:
         return int(s) if s else int(default)
 
 
+def _as_optional_float(x: Any) -> float | None:
+    """把可能为空/None 的值解析为可选浮点数。
+
+    约定：
+        - None/"" -> None
+        - 其它 -> float
+    """
+
+    if x is None:
+        return None
+    s = str(x).strip()
+    if not s:
+        return None
+    return float(x)
+
+
 _DETECTOR = Literal["fake", "color", "rknn", "pt"]
 _GROUP_BY = Literal["trigger_index", "frame_num", "sequence"]
 _TIME_SYNC_MODE = Literal["frame_host_timestamp", "dev_timestamp_mapping"]
@@ -318,6 +334,16 @@ class OnlineAppConfig:
     image_offset_x: int = 0
     image_offset_y: int = 0
 
+    # 可选：曝光/增益（会在 StartGrabbing 前下发）。
+    # 说明：
+    # - 默认保持旧行为：关闭 Auto，并设置固定曝光/增益。
+    # - 若想完全不干预曝光/增益，可显式把 exposure_auto/gain_auto 置空字符串，
+    #   且把 exposure_time_us/gain 置为 null。
+    exposure_auto: str = "Off"
+    exposure_time_us: float | None = 10000.0
+    gain_auto: str = "Off"
+    gain: float | None = 12.0
+
     calib: Path = Path("data/calibration/example_triple_camera_calib.json")
     detector: _DETECTOR = "fake"
     model: Path | None = None
@@ -500,6 +526,19 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
     image_offset_x = _as_int(data.get("image_offset_x"), 0)
     image_offset_y = _as_int(data.get("image_offset_y"), 0)
 
+    # 曝光/增益：默认保持旧行为。
+    exposure_auto_raw = data.get("exposure_auto", "Off")
+    exposure_auto = "" if exposure_auto_raw is None else str(exposure_auto_raw).strip()
+    exposure_time_us = _as_optional_float(data.get("exposure_time_us", 10000.0))
+    gain_auto_raw = data.get("gain_auto", "Off")
+    gain_auto = "" if gain_auto_raw is None else str(gain_auto_raw).strip()
+    gain = _as_optional_float(data.get("gain", 12.0))
+
+    if exposure_time_us is not None and float(exposure_time_us) <= 0:
+        raise RuntimeError("online config exposure_time_us must be > 0 (or null to disable)")
+    if gain is not None and float(gain) < 0:
+        raise RuntimeError("online config gain must be >= 0 (or null to disable)")
+
     detector_crop_size = _as_int(data.get("detector_crop_size"), 0)
     detector_crop_smooth_alpha = float(data.get("detector_crop_smooth_alpha", 0.2))
     detector_crop_max_step_px = _as_int(data.get("detector_crop_max_step_px"), 120)
@@ -555,6 +594,10 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         image_height=image_height,
         image_offset_x=int(image_offset_x),
         image_offset_y=int(image_offset_y),
+        exposure_auto=str(exposure_auto),
+        exposure_time_us=(float(exposure_time_us) if exposure_time_us is not None else None),
+        gain_auto=str(gain_auto),
+        gain=(float(gain) if gain is not None else None),
         calib=_as_path(data.get("calib", "data/calibration/example_triple_camera_calib.json")),
         detector=_as_detector(data.get("detector"), "fake"),
         model=_as_optional_path(data.get("model")),

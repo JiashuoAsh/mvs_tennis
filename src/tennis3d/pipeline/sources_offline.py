@@ -6,7 +6,7 @@
 - 计算组级别的时间轴信息（capture_t_abs / capture_host_timestamp）。
 
 依赖方向：
-- 本模块属于 pipeline 层，可依赖 `mvs.metadata_io` / `mvs.time_mapping`，但不应依赖在线入口层。
+- 本模块属于 pipeline 层，可依赖 `mvs.session.metadata_io` / `mvs.session.time_mapping`（或其在 `mvs` 的公共导出），但不应依赖在线入口层。
 """
 
 from __future__ import annotations
@@ -17,8 +17,8 @@ from typing import Any, Iterator
 import cv2
 import numpy as np
 
-from mvs.metadata_io import iter_metadata_records
-from mvs.time_mapping import LinearTimeMapping, load_time_mappings_json
+from mvs import LinearTimeMapping, load_time_mappings_json
+from mvs.session.metadata_io import iter_metadata_records
 
 from .time_utils import host_timestamp_to_seconds, median_float, median_int
 

@@ -18,7 +18,7 @@ import unittest
 
 import numpy as np
 
-from mvs.runtime_roi import IntNodeInfo
+from mvs.sdk.runtime_roi import IntNodeInfo
 from tennis3d.geometry.calibration import CalibrationSet, CameraCalibration
 from tennis3d.geometry.triangulation import project_point
 from tennis3d.models import Detection

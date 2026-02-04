@@ -7,14 +7,14 @@
   - 两级 ROI（相机 AOI + software crop）：`TwoStageKinematicRoiController`
 
 说明：
-- 本模块属于 apps/entry 层：可以依赖 mvs.runtime_roi 与 pipeline 的 ROI 控制器实现。
+- 本模块属于 apps/entry 层：可以依赖 `mvs.sdk.runtime_roi` 与 pipeline 的 ROI 控制器实现。
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from mvs.runtime_roi import get_int_node_info, try_set_int_node
+from mvs.sdk.runtime_roi import get_int_node_info, try_set_int_node
 
 from tennis3d.pipeline.roi import KinematicRoiConfig, KinematicRoiController
 from tennis3d.pipeline.two_stage_roi import (
@@ -28,7 +28,7 @@ from .spec import OnlineRunSpec
 
 
 def build_roi_controller(*, spec: OnlineRunSpec, cap: Any, binding: Any):
-    """构建 ROI 控制器（可选）。
+    """构建 ROI 控制器（Optional）。
 
     返回：
     - 未启用 ROI：None

@@ -35,10 +35,31 @@ pixel_format: BayerRG8
 # image_offset_x: 0
 # image_offset_y: 0
 
+# 曝光/增益：默认保持旧行为（关闭 Auto + 固定参数）。
+exposure_auto: Off
+exposure_time_us: 10000.0
+gain_auto: Off
+gain: 12.0
+
 image_width: 1980
 image_height: 1080
 image_offset_x: 200
 image_offset_y: 800
+
+# 可选：相机侧 AOI（运行中动态平移 OffsetX/OffsetY）。
+#
+# 典型用途：
+# - 固定 image_width/image_height 作为 AOI 窗口尺寸（降带宽）
+# - 启用 camera_aoi_runtime 让 AOI 窗口跟随球移动（进一步降带宽）
+# - 如需进一步提速，可叠加 detector_crop_size（在 AOI 内软件裁剪，降算力）
+#
+# 注意：需要机型支持在取流中写 OffsetX/OffsetY；不支持时写入会失败，窗口不会移动。
+# camera_aoi_runtime: true
+# camera_aoi_update_every_groups: 2
+# camera_aoi_min_move_px: 8
+# camera_aoi_smooth_alpha: 0.3
+# camera_aoi_max_step_px: 160
+# camera_aoi_recenter_after_missed: 30
 
 # 这里演示 detector=pt（Windows 友好）；你也可以改为 fake/color 做链路验证。
 detector: pt
@@ -52,10 +73,10 @@ pt_device: cuda:0
 # 软件裁剪（动态 ROI，可选）：在 detector 前裁剪小窗口以提高吞吐。
 # 重要：裁剪坐标系下的 bbox 会自动加回 offset，保证下游仍是“原图像素坐标系”（这里的“原图”指相机输出的 ROI 图像）。
 # 建议：先用较大/稳定的相机 ROI 把球路径覆盖住，再开启软件裁剪做“跟踪式小窗推理”。
-# detector_crop_size: 640
-# detector_crop_smooth_alpha: 0.2
-# detector_crop_max_step_px: 120
-# detector_crop_reset_after_missed: 8
+detector_crop_size: 1080
+detector_crop_smooth_alpha: 0.2
+detector_crop_max_step_px: 120
+detector_crop_reset_after_missed: 8
 
 min_score: 0.01
 require_views: 2
@@ -120,8 +141,8 @@ trigger:
 # 可选：轨迹拟合后处理（curve v3）。默认 disabled。
 curve:
   enabled: true
-  y_offset_m: 0.13
-  y_negate: true
+  y_offset_m: 0.0
+  y_negate: false
   # 主输出算法：v3（默认）| v2（curve2 legacy）| v3_legacy（v3 的 legacy 适配层）
   primary: v2
   compare_v2: false
@@ -149,7 +170,7 @@ curve:
 
   # 轨迹片段（episode）判定（默认关闭）
   # 起始判定固定为：z 方向门控 + y 轴重力一致性（ay≈g）。
-  episode_enabled: false
+  episode_enabled: true
   episode_buffer_s: 0.6
   episode_min_obs: 5
   episode_z_dir: 0

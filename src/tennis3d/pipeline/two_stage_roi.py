@@ -22,7 +22,7 @@ from typing import Any, Callable, Protocol
 
 import numpy as np
 
-from mvs.runtime_roi import IntNodeInfo, clamp_and_align
+from mvs.sdk.runtime_roi import IntNodeInfo, clamp_and_align
 from tennis3d.geometry.calibration import CalibrationSet
 from tennis3d.geometry.triangulation import project_point
 from tennis3d.preprocess import crop_bgr
@@ -148,7 +148,7 @@ class TwoStageKinematicRoiController(RoiController):
     """两级 ROI 控制器。
 
     - preprocess_for_detection：在当前 AOI 图像上做软件裁剪；同时返回 total_offset（相机 offset + 裁剪 offset）。
-    - update_after_output：用当前组的 3D 输出更新状态；可选更新相机 OffsetX/OffsetY（用于下一组）。
+    - update_after_output：用当前组的 3D 输出更新状态；Optional更新相机 OffsetX/OffsetY（用于下一组）。
 
     关键策略：
     - 未锁定到第一颗球之前，不做软件裁剪（避免闭环自锁死）。

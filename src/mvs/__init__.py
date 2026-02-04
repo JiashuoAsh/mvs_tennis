@@ -9,8 +9,8 @@
 - 运行机器需要能找到 MvCameraControl.dll（或通过参数/环境变量提供）。
 """
 
-from mvs.binding import MvsBinding, MvsDllNotFoundError, load_mvs_binding
-from mvs.camera import (
+from mvs.sdk.binding import MvsBinding, MvsDllNotFoundError, load_mvs_binding
+from mvs.sdk.camera import (
     MvsCamera,
     MvsError,
     MvsSdk,
@@ -19,19 +19,19 @@ from mvs.camera import (
     configure_resolution,
     configure_trigger,
 )
-from mvs.devices import DeviceDesc, enumerate_devices
-from mvs.events import MvsEvent
-from mvs.grab import FramePacket, Grabber
-from mvs.grouping import TriggerGroupAssembler
-from mvs.pipeline import QuadCapture, open_quad_capture
-from mvs.save import save_frame_as_bmp
-from mvs.soft_trigger import SoftwareTriggerLoop
-from mvs.bandwidth import BandwidthEstimate, estimate_camera_bandwidth, format_bandwidth_report
-from mvs.capture_session_recording import run_capture_session
-from mvs.capture_session_types import CaptureSessionConfig, CaptureSessionResult
-from mvs.roi import normalize_roi
-from mvs.triggering import TriggerPlan, build_trigger_plan
-from mvs.time_mapping import (
+from mvs.sdk.devices import DeviceDesc, enumerate_devices
+from mvs.core.events import MvsEvent
+from mvs.capture.grab import FramePacket, Grabber
+from mvs.capture.grouping import TriggerGroupAssembler
+from mvs.capture.pipeline import QuadCapture, open_quad_capture
+from mvs.capture.save import save_frame_as_bmp
+from mvs.capture.soft_trigger import SoftwareTriggerLoop
+from mvs.capture.bandwidth import BandwidthEstimate, estimate_camera_bandwidth, format_bandwidth_report
+from mvs.session.capture_session_recording import run_capture_session
+from mvs.session.capture_session_types import CaptureSessionConfig, CaptureSessionResult
+from mvs.core.roi import normalize_roi
+from mvs.capture.triggering import TriggerPlan, build_trigger_plan
+from mvs.session.time_mapping import (
     LinearTimeMapping,
     OnlineDevToHostMapper,
     collect_frame_pairs_from_metadata,

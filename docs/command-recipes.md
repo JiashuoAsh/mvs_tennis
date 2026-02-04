@@ -217,12 +217,11 @@ python -m mvs.apps.quad_capture \
 	--master-line-source ExposureStartActive \
 	--trigger-source Line0 \
 	--trigger-activation FallingEdge \
-	# --exposure-auto Off --exposure-us 10000 \
-	--exposure-auto Off --exposure-us 2000 \
+	--exposure-auto Off --exposure-us 10000 \
 	--gain-auto Off --gain 15 \
 	--save-mode sdk-bmp \
 	--soft-trigger-fps 18 \
-	--max-groups 0 \
+	--max-groups 10 \
 	--max-wait-seconds 10 \
     --image-width 2448 \
 	--image-height 2048 \
@@ -391,10 +390,10 @@ uv run python tools/mvs_relayout_by_camera.py \
 命令：
 
 ```bash
-uv run python tools/generate_params_4cam_calib.py \
+uv run python tools/generate_camera_extrinsics.py \
   --intrinsics-dir data/calibration/inputs/2026-01-30 \
   --extrinsics-file data/calibration/base_to_camera_extrinsics.json \
-  --out data/calibration/params_4cam_calib.json \
+  --out data/calibration/camera_extrinsics_C_T_B.json \
   --map cam0=DA8199303 \
   --map cam1=DA8199402 \
   --map cam2=DA8199243 \
@@ -403,7 +402,7 @@ uv run python tools/generate_params_4cam_calib.py \
 
 验证标准：
 
-- 输出文件 `data/calibration/params_4cam_calib.json` 生成成功。
+- 输出文件 `data/calibration/camera_extrinsics_C_T_B.json` 生成成功。
 
 ### 拟合时间映射
 

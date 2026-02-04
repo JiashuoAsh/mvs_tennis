@@ -3,7 +3,7 @@
 """采集会话：落盘录制实现。
 
 职责：
-- 打开 `mvs.pipeline.open_quad_capture` 并持续获取同步组包。
+ - 打开 `mvs.capture.pipeline.open_quad_capture` 并持续获取同步组包。
 - 写 `metadata.jsonl`（组记录 + 相机事件记录）。
 - 可选保存图像（SDK BMP）或原始帧数据（RAW）。
 - 打印关键诊断信息（带宽估算、队列深度、dropped_groups 等）。
@@ -20,10 +20,10 @@ import queue
 import time
 from pathlib import Path
 
-from mvs.bandwidth import estimate_camera_bandwidth, format_bandwidth_report
-from mvs.events import MvsEvent
-from mvs.pipeline import open_quad_capture
-from mvs.save import save_frame_as_bmp
+from mvs.capture.bandwidth import estimate_camera_bandwidth, format_bandwidth_report
+from mvs.capture.pipeline import open_quad_capture
+from mvs.capture.save import save_frame_as_bmp
+from mvs.core.events import MvsEvent
 
 from .capture_session_types import CaptureSessionConfig, CaptureSessionResult
 
