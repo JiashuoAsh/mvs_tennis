@@ -80,26 +80,67 @@ class CurveStage:
             tr.v3_legacy = self._new_v3_legacy(imps)
 
         tr.predicted_land_time_abs = None
+        tr.predicted_second_land_time_abs = None
         setattr(tr, "_last_v2_points", None)
         setattr(tr, "_last_v3_legacy_points", None)
 
     def _maybe_update_predicted_land_time_abs(self, tr: _Track) -> None:
-        if tr.v3 is None:
+        predictor = tr.v3 or tr.v3_legacy or tr.v2
+        if predictor is None:
             return
-        v3 = tr.v3
-        time_base_abs = getattr(v3, "time_base_abs", None)
+
+        # 每次更新都显式覆盖，避免在分段/后验变化后残留旧值。
+        tr.predicted_land_time_abs = None
+        tr.predicted_second_land_time_abs = None
+
+        time_base_abs = getattr(predictor, "time_base_abs", None)
+        if not isinstance(time_base_abs, (int, float)):
+            time_base_abs = getattr(predictor, "time_base", None)
         if not isinstance(time_base_abs, (int, float)):
             return
+
+        # first land：v3 走 predicted_land_time_rel；v2/legacy 走 land_point[0][-1]
+        t1_rel_f: float | None = None
         try:
-            t_rel = v3.predicted_land_time_rel()
+            fn1 = getattr(predictor, "predicted_land_time_rel", None)
+            if callable(fn1):
+                t1 = fn1()
+                if isinstance(t1, (int, float)):
+                    t1_rel_f = float(t1)
         except Exception:
-            t_rel = None
-        if t_rel is None:
+            t1_rel_f = None
+
+        if t1_rel_f is None:
+            lp0 = getattr(predictor, "land_point", None)
+            try:
+                if isinstance(lp0, list) and lp0 and lp0[0] is not None:
+                    t1_rel_f = float(lp0[0][-1])
+            except Exception:
+                t1_rel_f = None
+
+        if t1_rel_f is not None:
+            try:
+                tr.predicted_land_time_abs = float(time_base_abs + float(t1_rel_f))
+            except Exception:
+                tr.predicted_land_time_abs = None
+
+        # second land：要求所有 curve 都提供 predicted_second_land_time_rel 接口。
+        t2_rel_f: float | None = None
+        try:
+            fn2 = getattr(predictor, "predicted_second_land_time_rel", None)
+            if callable(fn2):
+                t2 = fn2()
+                if isinstance(t2, (int, float)):
+                    t2_rel_f = float(t2)
+        except Exception:
+            t2_rel_f = None
+
+        if t2_rel_f is None:
             return
         try:
-            tr.predicted_land_time_abs = float(time_base_abs + float(t_rel))
+            tr.predicted_second_land_time_abs = float(time_base_abs + float(t2_rel_f))
         except Exception:
-            pass
+            tr.predicted_second_land_time_abs = None
 
     def _feed_track_predictors(self, tr: _Track, imps: _CurveImports, o: _RecentObs) -> None:
         # v3：新 API（落点/走廊）。

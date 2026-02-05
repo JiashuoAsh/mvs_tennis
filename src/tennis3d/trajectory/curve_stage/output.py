@@ -66,6 +66,9 @@ def _track_snapshot(track: _Track, cfg: CurveStageConfig) -> dict[str, Any]:
             "end_t_abs": float(track.episode_end_t_abs) if track.episode_end_t_abs is not None else None,
             "end_reason": str(track.episode_end_reason) if track.episode_end_reason is not None else None,
             "predicted_land_time_abs": float(track.predicted_land_time_abs) if track.predicted_land_time_abs is not None else None,
+            "predicted_second_land_time_abs": float(track.predicted_second_land_time_abs)
+            if track.predicted_second_land_time_abs is not None
+            else None,
         }
 
     if track.v3 is not None:
@@ -75,6 +78,8 @@ def _track_snapshot(track: _Track, cfg: CurveStageConfig) -> dict[str, Any]:
             "time_base_abs": float(time_base_abs) if time_base_abs is not None else None,
             "predicted_land_time_rel": None,
             "predicted_land_time_abs": None,
+            "predicted_second_land_time_rel": None,
+            "predicted_second_land_time_abs": None,
             "predicted_land_point": None,
             "predicted_land_speed": None,
             "corridor_on_planes_y": None,
@@ -90,6 +95,19 @@ def _track_snapshot(track: _Track, cfg: CurveStageConfig) -> dict[str, Any]:
         if t_rel is not None and time_base_abs is not None:
             out_v3["predicted_land_time_rel"] = float(t_rel)
             out_v3["predicted_land_time_abs"] = float(time_base_abs + float(t_rel))
+
+        # second land：仅在 v3 提供该接口时输出。
+        t2_rel = None
+        try:
+            fn2 = getattr(v3, "predicted_second_land_time_rel", None)
+            if callable(fn2):
+                t2_rel = fn2()
+        except Exception:
+            t2_rel = None
+
+        if isinstance(t2_rel, (int, float)) and time_base_abs is not None:
+            out_v3["predicted_second_land_time_rel"] = float(t2_rel)
+            out_v3["predicted_second_land_time_abs"] = float(time_base_abs + float(t2_rel))
 
         try:
             lp = v3.predicted_land_point()

@@ -8,7 +8,7 @@
 
 用法建议：
 
-1) 从 `examples/configs/templates/*.yaml` 复制一份到 `configs/`。
+1) 从 `examples/configs/templates/*.yaml` 复制一份到 `configs/online/` 或 `configs/offline/`。
 2) 把占位符（例如 `<CAM1_SERIAL>`、`<PATH_TO_CALIB>`）替换为你的真实值。
-3) 用 `uv run ... --config configs/xxx.yaml` 运行。
+3) 用 `uv run ... --config configs/online/xxx.yaml`（或 `configs/offline/xxx.yaml`）运行。
 

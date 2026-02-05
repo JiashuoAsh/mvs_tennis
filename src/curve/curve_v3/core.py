@@ -696,6 +696,60 @@ class CurvePredictorV3:
             return None
         return float(self._bounce_event.t_rel)
 
+    def predicted_second_land_time_rel(self) -> float | None:
+        """预测反弹后的“第二次落地”时刻（相对 time_base_abs）。
+
+        说明：
+            - 这里的“落地”指球在反弹后再次回到触地点高度（cfg.bounce_contact_y）。
+            - 若已有 posterior，则优先使用 posterior 的 vy；否则使用 prior 候选混合的
+              名义状态 vy（见 prior_nominal_state）。
+            - 采用理想竖直抛运动近似：tau = 2 * vy / g。
+
+        Returns:
+            第二次落地的相对时刻（秒）；不可用时返回 None。
+        """
+
+        if self._bounce_event is None:
+            return None
+
+        g = float(self._cfg.gravity)
+        if (not math.isfinite(float(g))) or float(g) <= 0.0:
+            return None
+
+        # 反弹后：posterior 优先；无 posterior 时回退为 prior 候选混合。
+        state = self._posterior_state or prior_nominal_state(
+            bounce=self._bounce_event,
+            candidates=self._candidates,
+        )
+        if state is None:
+            return None
+
+        try:
+            vy = float(state.vy)
+            t_b = float(state.t_b_rel)
+        except Exception:
+            return None
+
+        # vy<=0 表示反弹后没有“向上飞行段”，此时 second land 无物理意义。
+        if (not math.isfinite(float(vy))) or float(vy) <= 0.0:
+            return None
+
+        tau = 2.0 * float(vy) / float(g)
+        if (not math.isfinite(float(tau))) or float(tau) <= 0.0:
+            return None
+
+        return float(t_b + float(tau))
+
+    def predicted_second_land_time_abs(self) -> float | None:
+        """预测反弹后的“第二次落地”绝对时刻（秒）。"""
+
+        if self._time_base_abs is None:
+            return None
+        t_rel = self.predicted_second_land_time_rel()
+        if t_rel is None:
+            return None
+        return float(self._time_base_abs + float(t_rel))
+
     def predicted_land_speed(self) -> list[float] | None:
         if self._bounce_event is None:
             return None

@@ -205,7 +205,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             include_detection_details=True,
         )
 
-        # 可选：对 3D 输出做轨迹拟合增强（落点/落地时间/走廊）。
+        # Optional：对 3D 输出做轨迹拟合增强（落点/落地时间/走廊）。
         records = apply_curve_stage(records, curve_cfg)
 
         for out_rec in records:

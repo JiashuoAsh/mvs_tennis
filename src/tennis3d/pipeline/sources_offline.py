@@ -56,7 +56,7 @@ def iter_capture_image_groups(
     Args:
         captures_dir: captures 目录（包含 metadata.jsonl 与各帧图像文件）。
         max_groups: 最多处理的组数（0 表示不限）。
-        serials: 可选的相机序列号白名单；为 None 时不过滤。
+        serials: Optional的相机序列号白名单；为 None 时不过滤。
         time_sync_mode: 时间轴策略（frame_host_timestamp / dev_timestamp_mapping）。
         time_mapping_path: 当 time_sync_mode=dev_timestamp_mapping 时使用的映射文件。
 
@@ -107,7 +107,7 @@ def iter_capture_image_groups(
         capture_t_abs: float | None = host_timestamp_to_seconds(host_ts_med) if host_ts_med is not None else None
         capture_t_source: str | None = "frame_host_timestamp" if capture_t_abs is not None else None
 
-        # 可选：用映射后的时间替代默认 host_timestamp 聚合。
+        # Optional：用映射后的时间替代默认 host_timestamp 聚合。
         if mappings is not None:
             mapped_ms_list: list[float] = []
             for fr in frames:

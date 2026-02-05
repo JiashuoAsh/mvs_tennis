@@ -46,21 +46,27 @@ def test_load_online_app_config_supports_output_controls(tmp_path: Path) -> None
     cfg_path.write_text(
         json.dumps(
             {
-                "mvimport_dir": "",
-                "dll_dir": "",
-                "serials": ["A", "B"],
-                "calib": "data/calibration/example_triple_camera_calib.json",
-                "exposure_auto": "Off",
-                "exposure_time_us": 8000.0,
-                "gain_auto": "Off",
-                "gain": 6.0,
-                "pt_device": "cuda:0",
-                "terminal_print_mode": "none",
-                "terminal_status_interval_s": 1.0,
-                "out_jsonl": "data/tools_output/x.jsonl",
-                "out_jsonl_only_when_balls": True,
-                "out_jsonl_flush_every_records": 10,
-                "out_jsonl_flush_interval_s": 0.5,
+                "sdk": {
+                    "mvimport_dir": "",
+                    "dll_dir": "",
+                },
+                "camera": {
+                    "serials": ["A", "B"],
+                    "calib": "data/calibration/example_triple_camera_calib.json",
+                    "exposure": {"auto": "Off", "time_us": 8000.0},
+                    "gain": {"auto": "Off", "value": 6.0},
+                },
+                "detector": {
+                    "pt_device": "cuda:0",
+                },
+                "output": {
+                    "terminal_print_mode": "none",
+                    "terminal_status_interval_s": 1.0,
+                    "out_jsonl": "data/tools_output/x.jsonl",
+                    "out_jsonl_only_when_balls": True,
+                    "out_jsonl_flush_every_records": 10,
+                    "out_jsonl_flush_interval_s": 0.5,
+                },
                 "trigger": {
                     "trigger_source": "Software",
                     "master_serial": "",

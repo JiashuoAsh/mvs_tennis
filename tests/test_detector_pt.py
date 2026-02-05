@@ -16,14 +16,22 @@ def test_offline_config_accepts_pt(tmp_path: Path) -> None:
     cfg_path.write_text(
         json.dumps(
             {
-                "captures_dir": "data/captures_master_slave/tennis_test",
-                "calib": "data/calibration/example_triple_camera_calib.json",
-                "detector": "pt",
-                "model": "data/models/best.pt",
-                "min_score": 0.25,
-                "require_views": 2,
-                "max_groups": 1,
-                "out_jsonl": "data/tools_output/offline_positions_3d.jsonl",
+                "input": {
+                    "captures_dir": "data/captures_master_slave/tennis_test",
+                    "calib": "data/calibration/example_triple_camera_calib.json",
+                },
+                "detector": {
+                    "name": "pt",
+                    "model": "data/models/best.pt",
+                    "min_score": 0.25,
+                    "require_views": 2,
+                },
+                "run": {
+                    "max_groups": 1,
+                },
+                "output": {
+                    "out_jsonl": "data/tools_output/offline_positions_3d.jsonl",
+                },
             },
             ensure_ascii=False,
         ),

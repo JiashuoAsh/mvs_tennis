@@ -112,7 +112,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    # 相机图像参数（可选）。0/空字符串表示不设置，沿用相机当前配置。
+    # 相机图像参数（Optional）。0/空字符串表示不设置，沿用相机当前配置。
     p.add_argument("--pixel-format", default="", help="PixelFormat (e.g. BayerRG8). Empty means do not set.")
     p.add_argument("--image-width", type=int, default=0, help="ROI width (0 = do not set)")
     p.add_argument("--image-height", type=int, default=0, help="ROI height (0 = do not set)")

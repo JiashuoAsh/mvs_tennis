@@ -63,7 +63,7 @@ B) 冲突消解与去重（组内多球）
 - 还需要 3D 级别去重：多个候选可能是同一个球的重复解（不同相机组合导致）。请做 3D-NMS（例如距离阈值 `merge_dist_m`）或按重投影误差合并。
 
 C) 可配置参数（放到 config，并在 CLI 暴露或配置文件中可控）
-在 config.py 与 `configs/*.yaml` 的离线/在线配置里加入（名称可调整，但必须具备能力）：
+在 config.py 与 `configs/**/*.yaml` 的离线/在线配置里加入（名称可调整，但必须具备能力）：
 - `max_detections_per_camera`（每相机最多取 topK）
 - `max_reproj_error_px`（候选有效阈值）
 - `max_uv_match_dist_px`（投影到相机后匹配 bbox center 的阈值）

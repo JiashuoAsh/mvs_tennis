@@ -292,6 +292,35 @@ class Curve:
 
         return seg_id, self.land_speed[0], [bounce_vx, -bounce_vy, bounce_vz, bounce_vxz]
 
+    def predicted_second_land_time_rel(self) -> float | None:
+        """预测第二段（反弹后）的落地相对时刻（相对 time_base）。
+
+        说明：
+            legacy 适配层在 add_frame 中会尝试补全 land_point[1]（对齐 curve2 的约定），
+            其中 land_point[1][-1] 即为第二段落地的相对时刻。
+        """
+
+        lp = self.land_point[1]
+        if lp is None:
+            return None
+        try:
+            return float(lp[-1])
+        except Exception:
+            return None
+
+    def predicted_second_land_time_abs(self) -> float | None:
+        """预测第二段（反弹后）的落地绝对时刻。"""
+
+        if self.time_base is None:
+            return None
+        t_rel = self.predicted_second_land_time_rel()
+        if t_rel is None:
+            return None
+        try:
+            return float(self.time_base + float(t_rel))
+        except Exception:
+            return None
+
     def calc_net_clearance(self):
         # Legacy：使用反弹前的线性 z(t) 求解 z==12 的时刻，并在该时刻计算 y。
         # 这要求 pre-bounce 拟合已存在。

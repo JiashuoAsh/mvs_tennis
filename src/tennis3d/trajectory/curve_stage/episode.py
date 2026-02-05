@@ -106,11 +106,29 @@ def _episode_try_end(cfg: CurveStageConfig, tr: _Track, *, now_t_abs: float, eve
     if not bool(tr.episode_active):
         return False
 
+    # 说明：
+    # - predicted_land_time_abs：第一段落地/反弹锚点（用于判定何时“应该已经有 second land”）。
+    # - predicted_second_land_time_abs：第二段（反弹后）再次落地时刻（episode 应覆盖两段）。
+    #
+    # 新约束：
+    # - episode 的“基于落地的自动结束”只允许使用 second land。
+    # - 若已经到了 first land + buffer 的时间窗口，但 second land 仍不可用，则直接报错，
+    #   不允许回退到 predicted_land_time_abs（避免向下兼容掩盖问题）。
+
     if tr.predicted_land_time_abs is not None:
-        if float(now_t_abs) >= float(tr.predicted_land_time_abs) + float(cfg.episode_end_after_predicted_land_s):
+        t_gate = float(tr.predicted_land_time_abs) + float(cfg.episode_end_after_predicted_land_s)
+
+        if float(now_t_abs) >= float(t_gate) and tr.predicted_second_land_time_abs is None:
+            raise RuntimeError(
+                "episode_end 需要 predicted_second_land_time_abs，但当前为 None；"
+                "已进入 first_land+buffer 窗口，禁止回退到 predicted_land_time_abs。"
+            )
+
+    if tr.predicted_second_land_time_abs is not None:
+        if float(now_t_abs) >= float(tr.predicted_second_land_time_abs) + float(cfg.episode_end_after_predicted_land_s):
             tr.episode_active = False
-            tr.episode_end_t_abs = float(tr.predicted_land_time_abs)
-            tr.episode_end_reason = "after_predicted_land"
+            tr.episode_end_t_abs = float(tr.predicted_second_land_time_abs)
+            tr.episode_end_reason = "after_predicted_second_land"
             events.append(
                 {
                     "event": "episode_end",

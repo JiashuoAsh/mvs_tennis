@@ -34,11 +34,15 @@ def test_load_offline_app_config_supports_pt_device(tmp_path: Path) -> None:
     cfg_path.write_text(
         json.dumps(
             {
-                "captures_dir": "data/captures_master_slave/tennis_test",
-                "calib": "data/calibration/example_triple_camera_calib.json",
-                "detector": "pt",
-                "model": "data/models/best.pt",
-                "pt_device": "cuda:0",
+                "input": {
+                    "captures_dir": "data/captures_master_slave/tennis_test",
+                    "calib": "data/calibration/example_triple_camera_calib.json",
+                },
+                "detector": {
+                    "name": "pt",
+                    "model": "data/models/best.pt",
+                    "pt_device": "cuda:0",
+                },
             },
             ensure_ascii=False,
         ),

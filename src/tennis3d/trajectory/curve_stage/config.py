@@ -39,7 +39,7 @@ class CurveStageConfig:
     conf_from: str = "quality"  # quality|constant
     constant_conf: float = 1.0
 
-    # 可选：对输入到 curve 的坐标做轻量变换。
+    # Optional：对输入到 curve 的坐标做轻量变换。
     # 说明：
     # - 仅影响“传给 curve_v3/v2/legacy 的观测值”，不会修改上游定位输出 balls[*].ball_3d_world。
     # - 默认不变换（保持旧行为）。
@@ -80,7 +80,7 @@ class CurveStageConfig:
 
     # y 轴重力一致性检查。
     episode_gravity_mps2: float = 9.8
-    episode_gravity_tol_mps2: float = 3.0
+    episode_gravity_tol_mps2: float = 4.9
 
     # episode 结束判定：
     episode_stationary_speed_mps: float = 0.25
@@ -90,5 +90,5 @@ class CurveStageConfig:
     # episode 行为。
     reset_predictor_on_episode_start: bool = True
     reset_predictor_on_episode_end: bool = True
-    feed_curve_only_when_episode_active: bool = False
-    episode_lock_single_track: bool = False
+    feed_curve_only_when_episode_active: bool = True
+    episode_lock_single_track: bool = True

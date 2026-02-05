@@ -31,6 +31,11 @@
     - [按相机重排 captures](#按相机重排-captures)
     - [生成 4 相机标定参数 JSON](#生成-4-相机标定参数-json)
     - [拟合时间映射](#拟合时间映射)
+  - [新加的](#新加的)
+    - [curve2 vs curve3 比较](#curve2-vs-curve3-比较)
+    - [离线：Ultralytics 叠框 + 三角化 3D（两脚本联动）](#离线ultralytics-叠框--三角化-3d两脚本联动)
+      - [1) 离线检测 + 保存叠框可视化](#1-离线检测--保存叠框可视化)
+      - [2) 用检测结果三角化得到 3D](#2-用检测结果三角化得到-3d)
 
 ---
 
@@ -391,7 +396,7 @@ uv run python tools/mvs_relayout_by_camera.py \
 
 ```bash
 uv run python tools/generate_camera_extrinsics.py \
-  --intrinsics-dir data/calibration/inputs/2026-01-30 \
+  --intrinsics-dir data/calibration/inputs/2026-02-03 \
   --extrinsics-file data/calibration/base_to_camera_extrinsics.json \
   --out data/calibration/camera_extrinsics_C_T_B.json \
   --map cam0=DA8199303 \
@@ -415,3 +420,62 @@ uv run python tools/mvs_fit_time_mapping.py --captures-dir data/captures_master_
 验证标准：
 
 - 命令执行完成，并在终端/输出文件中给出拟合结果（以工具实际输出为准）。
+
+
+
+## 新加的
+
+### curve2 vs curve3 比较
+
+```bash
+python examples/scratch/curve2_curve3_compare.py --disable-curve3 --png-all-post-n --out-png ./temp
+```
+
+### 离线：Ultralytics 叠框 + 三角化 3D（两脚本联动）
+
+用途：
+
+- 从 `data/captures_master_slave/tennis_offline` 的采集结果中，先用 `best.pt` 离线检测并保存叠框图。
+- 再把检测输出喂给 `tools/tennis_localize_from_detections.py` 做多目几何融合，得到每个 group 的 `balls` 列表（0..N 个 3D 点）。
+
+前置条件：
+
+- 已有离线采集目录：`data/captures_master_slave/tennis_offline`（包含 `metadata.jsonl` 与 `group_*/`）。
+- 已有 YOLO 模型：`data/models/best.pt`。
+- 已有相机标定：`data/calibration/camera_extrinsics_C_T_B.json`（相机 key 为序列号）。
+
+#### 1) 离线检测 + 保存叠框可视化
+
+命令：
+
+```bash
+uv run python tools/ultralytics_best_pt_smoketest.py \
+	--captures-dir data/captures_master_slave/tennis_offline \
+	--model data/models/best.pt \
+	--all \
+	--out-vis-dir data/tools_output/tennis_ultralytics_vis
+```
+
+预期输出 / 验证标准：
+
+- 生成检测 JSONL：`data/tools_output/tennis_ultralytics_detections.jsonl`
+- 生成叠框图片目录：`data/tools_output/tennis_ultralytics_vis/group_*/cam*_*.jpg`
+- 终端输出类似：`Done. groups=... images=... images_with_ball=...`
+
+#### 2) 用检测结果三角化得到 3D
+
+命令（无参默认读取上一步的 JSONL）：
+
+```bash
+uv run python tools/tennis_localize_from_detections.py
+```
+
+预期输出 / 验证标准：
+
+- 输出文件：`data/tools_output/tennis_positions_3d.json`
+- 终端输出类似：`Done. groups: N` 且 N>0
+- 若画面里有球且至少两路检出：`Done. balls: M` 且 M>0
+
+提示：
+
+- 若你只想先快速试跑：`uv run python tools/tennis_localize_from_detections.py --max-frames 50`

@@ -7,33 +7,38 @@
 # 用法示例：
 # - uv run python -m tennis3d.apps.offline_localize_from_captures --config examples/configs/templates/offline_fake_smoke.yaml
 
-captures_dir: <PATH_TO_CAPTURES_DIR>
-calib: <PATH_TO_CALIB_JSON_OR_YAML>
+input:
+  captures_dir: <PATH_TO_CAPTURES_DIR>
+  calib: <PATH_TO_CALIB_JSON_OR_YAML>
 
-detector: fake
-model: ""
+detector:
+  name: fake
+  model: ""
 
-# fake detector 的分数通常是固定值；这里保留字段以保持配置一致性
-min_score: 0.25
-require_views: 2
+  # fake detector 的分数通常是固定值；这里保留字段以保持配置一致性
+  min_score: 0.25
+  require_views: 2
 
-# 多球鲁棒定位参数（保持与 config.py 一致；冒烟模式也建议固定写出，避免“模板缺字段”）：
-max_detections_per_camera: 10
-max_reproj_error_px: 8.0
-max_uv_match_dist_px: 25.0
-merge_dist_m: 0.08
+  # 多球鲁棒定位参数（保持与 config.py 一致；冒烟模式也建议固定写出，避免“模板缺字段”）：
+  max_detections_per_camera: 10
+  max_reproj_error_px: 8.0
+  max_uv_match_dist_px: 25.0
+  merge_dist_m: 0.08
 
-max_groups: 20
+run:
+  max_groups: 20
 
-out_jsonl: data/tools_output/offline_positions_3d.jsonl
+output:
+  out_jsonl: data/tools_output/offline_positions_3d.jsonl
 
-# 时间轴（默认值：frame_host_timestamp）
-time_sync_mode: frame_host_timestamp
+time:
+  # 时间轴（默认值：frame_host_timestamp）
+  sync_mode: frame_host_timestamp
 
-# 可选：映射文件路径。
-# - 仅在 time_sync_mode=dev_timestamp_mapping 时生效
-# - 为空表示使用默认路径：<captures_dir>/time_mapping_dev_to_host_ms.json
-time_mapping_path: ""
+  # 可选：映射文件路径。
+  # - 仅在 sync_mode=dev_timestamp_mapping 时生效
+  # - 为空表示使用默认路径：<captures_dir>/time_mapping_dev_to_host_ms.json
+  mapping_path: ""
 
 # 可选：轨迹拟合后处理（curve v3）。默认 disabled。
 curve:

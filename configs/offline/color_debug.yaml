@@ -1,0 +1,30 @@
+﻿# 离线 3D 定位配置（纯 OpenCV 颜色阈值检测，适合调试链路）
+# 用法示例：
+# - uv run python -m tennis3d.apps.offline_localize_from_captures --config configs/offline/color_debug.yaml
+
+input:
+  captures_dir: data/captures/sample_sequence
+  calib: data/calibration/sample_cams.yaml
+
+detector:
+  # color/green：基于 HSV 的“绿色球”检测器
+  # 适合配合 tools/generate_sample_sequence.py 生成的绿色圆点数据快速验证三角化链路。
+  name: color
+
+  # color detector 不需要 model（留空或直接删掉该字段）
+  model: ""
+
+  min_score: 0.25
+  require_views: 2
+
+  # 多球鲁棒定位参数（默认值适合先跑通链路，误检较多时可调小阈值/调大 require_views）：
+  max_detections_per_camera: 10
+  max_reproj_error_px: 8.0
+  max_uv_match_dist_px: 25.0
+  merge_dist_m: 0.08
+
+run:
+  max_groups: 0
+
+output:
+  out_jsonl: data/tools_output/offline_positions_3d.color.jsonl

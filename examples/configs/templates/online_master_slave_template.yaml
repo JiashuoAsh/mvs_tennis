@@ -7,101 +7,110 @@
 # 用法示例：
 # - uv run python -m tennis3d.apps.online --config examples/configs/templates/online_master_slave_template.yaml
 
-# MVS Python 示例绑定目录（MvImport，可选）：
-mvimport_dir: ""
+sdk:
+  # MVS Python 示例绑定目录（MvImport，可选）：
+  mvimport_dir: ""
 
-# MVS SDK 动态库目录（可选）：
-dll_dir: ""
+  # MVS SDK 动态库目录（可选）：
+  dll_dir: ""
 
-# 注意：serials 的顺序对功能通常不敏感，但建议固定顺序，便于对齐输出与排查问题
-serials:
-  - "<MASTER_SERIAL>"  # master
-  - "<SLAVE1_SERIAL>"  # slave1
-  - "<SLAVE2_SERIAL>"  # slave2
-  - "<SLAVE3_SERIAL>"  # slave3
+camera:
+  # 注意：serials 的顺序对功能通常不敏感，但建议固定顺序，便于对齐输出与排查问题
+  serials:
+    - "<MASTER_SERIAL>"  # master
+    - "<SLAVE1_SERIAL>"  # slave1
+    - "<SLAVE2_SERIAL>"  # slave2
+    - "<SLAVE3_SERIAL>"  # slave3
 
-calib: <PATH_TO_CALIB_JSON_OR_YAML>
+  calib: <PATH_TO_CALIB_JSON_OR_YAML>
 
-# 可选：相机图像参数（会传给 SDK）。
-# - pixel_format 为空表示不设置（沿用相机当前配置）。
-# - image_width/image_height 必须同时设置；不设置就留空或删除。
-#
-# 说明：
-# - 这里的 ROI 是“相机侧裁剪”（改变相机输出的宽高/偏移），不是缩放。
-# - 如果你设置了固定 ROI（启动前一次性设置），在线入口会自动对标定做主点平移，保证像素坐标系一致。
-pixel_format: ""
-# image_width: 1920
-# image_height: 1080
-# image_offset_x: 0
-# image_offset_y: 0
+  # 可选：相机图像参数（会传给 SDK）。
+  # - pixel_format 为空表示不设置（沿用相机当前配置）。
+  # - roi.width/roi.height 必须同时设置；不设置就留空或删除。
+  #
+  # 说明：
+  # - 这里的 ROI 是“相机侧裁剪”（改变相机输出的宽高/偏移），不是缩放。
+  # - 如果你设置了固定 ROI（启动前一次性设置），在线入口会自动对标定做主点平移，保证像素坐标系一致。
+  pixel_format: ""
+  # roi:
+  #   width: 1920
+  #   height: 1080
+  #   offset_x: 0
+  #   offset_y: 0
 
-# 可选：曝光/增益（会在 StartGrabbing 前下发到相机）。
-# 默认保持旧行为：关闭 Auto，并设置固定曝光/增益。
-# - 若想完全不干预曝光/增益，可显式设置：
-#   exposure_auto: ""
-#   exposure_time_us: null
-#   gain_auto: ""
-#   gain: null
-exposure_auto: Off
-exposure_time_us: 10000.0
-gain_auto: Off
-gain: 12.0
+  # 可选：曝光/增益（会在 StartGrabbing 前下发到相机）。
+  # 默认保持旧行为：关闭 Auto，并设置固定曝光/增益。
+  # - 若想完全不干预曝光/增益，可显式设置：
+  #   exposure:
+  #     auto: ""
+  #     time_us: null
+  #   gain:
+  #     auto: ""
+  #     value: null
+  exposure:
+    auto: Off
+    time_us: 10000.0
+  gain:
+    auto: Off
+    value: 12.0
 
-# 可选：相机侧 AOI（运行中动态平移 OffsetX/OffsetY）。
-#
-# 典型用途：
-# - 先用 image_width/image_height 把相机输出裁到一个“足够大、不易丢球”的窗口（降带宽）
-# - 再启用 camera_aoi_runtime，让窗口跟随球移动（进一步降带宽）
-# - 如需进一步提速，可叠加 detector_crop_size（在 AOI 内二次软件裁剪，降算力）
-#
-# 注意：
-# - 需要机型支持在取流中写 OffsetX/OffsetY；不支持时写入会失败，窗口不会移动。
-# - 启用后不要做一次性的标定主点平移；本仓库会自动处理（camera_aoi_runtime=true 时不会 apply_sensor_roi_to_calibration）。
-# camera_aoi_runtime: true
-# camera_aoi_update_every_groups: 2
-# camera_aoi_min_move_px: 8
-# camera_aoi_smooth_alpha: 0.3
-# camera_aoi_max_step_px: 160
-# camera_aoi_recenter_after_missed: 30
+  # 可选：相机侧 AOI（运行中动态平移 OffsetX/OffsetY）。
+  #
+  # 典型用途：
+  # - 先用 roi.width/roi.height 把相机输出裁到一个“足够大、不易丢球”的窗口（降带宽）
+  # - 再启用 aoi.runtime ，让窗口跟随球移动（进一步降带宽）
+  # - 如需进一步提速，可叠加 detector.crop.size（在 AOI 内二次软件裁剪，降算力）
+  #
+  # 注意：
+  # - 需要机型支持在取流中写 OffsetX/OffsetY；不支持时写入会失败，窗口不会移动。
+  # - 启用后不要做一次性的标定主点平移；本仓库会自动处理（aoi.runtime=true 时不会 apply_sensor_roi_to_calibration）。
+  # aoi:
+  #   runtime: true
+  #   update_every_groups: 2
+  #   min_move_px: 8
+  #   smooth_alpha: 0.3
+  #   max_step_px: 160
+  #   recenter_after_missed: 30
 
-# detector 默认 fake（仅用于链路/冒烟）。真实使用通常改成 pt，并填写 model 路径。
-detector: fake
-model: ""
+detector:
+  # detector 默认 fake（仅用于链路/冒烟）。真实使用通常改成 pt，并填写 model 路径。
+  name: fake
+  model: ""
 
-min_score: 0.25
-require_views: 2
+  min_score: 0.25
+  require_views: 2
 
-# 多球鲁棒定位参数：
-max_detections_per_camera: 10
-max_reproj_error_px: 8.0
-max_uv_match_dist_px: 25.0
-merge_dist_m: 0.08
+  # 多球鲁棒定位参数：
+  max_detections_per_camera: 10
+  max_reproj_error_px: 8.0
+  max_uv_match_dist_px: 25.0
+  merge_dist_m: 0.08
 
-group_by: frame_num
+run:
+  group_by: frame_num
+  timeout_ms: 1000
+  group_timeout_ms: 1000
+  max_pending_groups: 256
+  max_groups: 0
 
-timeout_ms: 1000
-group_timeout_ms: 1000
-max_pending_groups: 256
-max_groups: 0
+output:
+  # 输出 JSONL（可选）。默认值：不写文件。
+  # - 置空（""）表示 None
+  out_jsonl: ""
 
-# 输出 JSONL（可选）。默认值：不写文件。
-# - 置空（""）表示 None
-out_jsonl: ""
+  # 终端输出模式：best|all|none
+  terminal_print_mode: best
 
-# 终端输出模式：
-# - best：只打印每组 top-1 球（更安静，默认）
-# - all：打印该组所有球（便于 debug 多球/误检）
-terminal_print_mode: best
+time:
+  # 在线时间轴（默认值：frame_host_timestamp）
+  sync_mode: dev_timestamp_mapping
 
-# 在线时间轴（默认值：frame_host_timestamp）
-time_sync_mode: dev_timestamp_mapping
-
-# 以下为在线滑窗映射参数（均为默认值）。仅在 time_sync_mode=dev_timestamp_mapping 时会用到。
-time_mapping_warmup_groups: 20
-time_mapping_window_groups: 200
-time_mapping_update_every_groups: 5
-time_mapping_min_points: 20
-time_mapping_hard_outlier_ms: 50.0
+  # 以下为在线滑窗映射参数（均为默认值）。仅在 sync_mode=dev_timestamp_mapping 时会用到。
+  mapping_warmup_groups: 20
+  mapping_window_groups: 200
+  mapping_update_every_groups: 5
+  mapping_min_points: 20
+  mapping_hard_outlier_ms: 50.0
 
 trigger:
   # slave 的触发源：常见为 Line0/Line1（取决于你的接线与相机设置）

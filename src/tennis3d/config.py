@@ -18,6 +18,26 @@ from typing import Any, Literal, cast
 from tennis3d.trajectory.curve_stage import CurveStageConfig
 
 
+def _as_section(parent: dict[str, Any], key: str) -> dict[str, Any]:
+    """把配置中的“段落”解析成 dict。
+
+    约定：
+        - 段落不存在或为 null -> 空 dict
+        - 段落存在但不是对象 -> 报错
+
+    说明：
+        为了让 YAML/JSON 更易读，我们把大量字段收拢到嵌套段落中（例如 camera/run/detector/output/time）。
+        本函数是这些段落的统一解析入口。
+    """
+
+    v = parent.get(key)
+    if v is None:
+        return {}
+    if not isinstance(v, dict):
+        raise RuntimeError(f"config section '{key}' must be an object")
+    return cast(dict[str, Any], v)
+
+
 def _load_mapping(path: Path) -> dict[str, Any]:
     path = Path(path)
     suf = path.suffix.lower()
@@ -88,8 +108,35 @@ def _as_int(x: Any, default: int = 0) -> int:
         return int(s) if s else int(default)
 
 
+def _as_auto_mode_str(x: Any) -> str:
+    """把 YAML/JSON 中的 *_auto 模式解析成 GenICam 期望的字符串。
+
+    背景：
+        PyYAML 的 `safe_load()` 默认按 YAML 1.1 解析标量，未加引号的 Off/On/Yes/No
+        可能会被解析为 bool（False/True）。
+
+        对 ExposureAuto/GainAuto 这类枚举节点而言，"False" 不是合法枚举值，
+        直接下发会触发 MV_E_PARAMETER(0x80000004)。
+
+    约定：
+        - None -> ""（表示“不设置”）
+        - False -> "Off"
+        - True -> "Continuous"（最常见/最直观的“开自动”模式）
+        - 其它 -> str(x).strip()
+    """
+
+    if x is None:
+        return ""
+
+    # YAML 兼容：Off/On 可能被解析成 bool。
+    if isinstance(x, bool):
+        return "Continuous" if bool(x) else "Off"
+
+    return str(x).strip()
+
+
 def _as_optional_float(x: Any) -> float | None:
-    """把可能为空/None 的值解析为可选浮点数。
+    """把可能为空/None 的值解析为Optional浮点数。
 
     约定：
         - None/"" -> None
@@ -141,7 +188,7 @@ def _as_terminal_print_mode(x: Any, default: str) -> _TERMINAL_PRINT_MODE:
 
 
 def _as_curve_stage_config(x: Any) -> CurveStageConfig:
-    """解析可选的 curve stage 配置段。
+    """解析Optional的 curve stage 配置段。
 
     说明：
         - 该段用于把 3D 定位输出进一步做轨迹拟合（落点/落地时间/走廊）。
@@ -161,7 +208,7 @@ def _as_curve_stage_config(x: Any) -> CurveStageConfig:
     if conf_from not in {"quality", "constant"}:
         raise RuntimeError("curve.conf_from must be 'quality' or 'constant'")
 
-    # 可选浮点字段：先取 raw，再转换，避免 None/Unknown 触发类型告警。
+    # Optional浮点字段：先取 raw，再转换，避免 None/Unknown 触发类型告警。
     obs_max_median_reproj_error_px = x.get("obs_max_median_reproj_error_px")
     obs_max_median_reproj_error_px_f = (
         float(obs_max_median_reproj_error_px) if obs_max_median_reproj_error_px is not None else None
@@ -266,11 +313,11 @@ def _as_curve_stage_config(x: Any) -> CurveStageConfig:
 class OfflineAppConfig:
     captures_dir: Path
     calib: Path
-    # 可选：仅使用这些相机序列号（serial）参与检测/定位；None 表示使用 captures 中出现的全部相机。
+    # Optional：仅使用这些相机序列号（serial）参与检测/定位；None 表示使用 captures 中出现的全部相机。
     serials: list[str] | None = None
     detector: _DETECTOR = "color"
     model: Path | None = None
-    # detector=pt 时可选：Ultralytics 推理设备。
+    # detector=pt 时Optional：Ultralytics 推理设备。
     # 说明：
     # - 默认 cpu（保持旧行为）。
     # - CUDA 环境可写 cuda:0 / 0 / cuda。
@@ -285,13 +332,13 @@ class OfflineAppConfig:
     max_groups: int = 0
     out_jsonl: Path = Path("data/tools_output/offline_positions_3d.jsonl")
 
-    # 可选：方案B（对齐映射）
+    # Optional：方案B（对齐映射）
     # - frame_host_timestamp：沿用原逻辑，用组内 frames[*].host_timestamp 中位数作为 capture_t_abs
     # - dev_timestamp_mapping：使用预先拟合的 dev_timestamp -> host_ms 映射，把组时间贴近曝光时刻
     time_sync_mode: _TIME_SYNC_MODE = "frame_host_timestamp"
     time_mapping_path: Path | None = None
 
-    # 可选：轨迹拟合后处理（落点/落地时间/走廊）。默认 disabled。
+    # Optional：轨迹拟合后处理（落点/落地时间/走廊）。默认 disabled。
     curve: CurveStageConfig = CurveStageConfig()
 
 
@@ -309,7 +356,7 @@ class OnlineTriggerConfig:
 
 @dataclass(frozen=True)
 class OnlineAppConfig:
-    # MVS 官方 Python 示例绑定目录（MvImport）。可选；不填则依赖环境变量/自动探测。
+    # MVS 官方 Python 示例绑定目录（MvImport）。Optional；不填则依赖环境变量/自动探测。
     mvimport_dir: Path | None
     dll_dir: Path | None
     serials: list[str]
@@ -324,7 +371,7 @@ class OnlineAppConfig:
     # 说明：该参数主要用于排障（例如硬触发线路未接好时避免无限等待）。
     max_wait_seconds: float = 0.0
 
-    # 可选：相机图像参数（ROI/像素格式）。
+    # Optional：相机图像参数（ROI/像素格式）。
     # 约定：
     # - pixel_format 为空表示不设置（沿用相机当前配置）。
     # - image_width/image_height 同时设置才生效；否则将报错。
@@ -334,7 +381,7 @@ class OnlineAppConfig:
     image_offset_x: int = 0
     image_offset_y: int = 0
 
-    # 可选：曝光/增益（会在 StartGrabbing 前下发）。
+    # Optional：曝光/增益（会在 StartGrabbing 前下发）。
     # 说明：
     # - 默认保持旧行为：关闭 Auto，并设置固定曝光/增益。
     # - 若想完全不干预曝光/增益，可显式把 exposure_auto/gain_auto 置空字符串，
@@ -347,7 +394,7 @@ class OnlineAppConfig:
     calib: Path = Path("data/calibration/example_triple_camera_calib.json")
     detector: _DETECTOR = "fake"
     model: Path | None = None
-    # detector=pt 时可选：Ultralytics 推理设备（默认 cpu）。
+    # detector=pt 时Optional：Ultralytics 推理设备（默认 cpu）。
     # 说明：CUDA 环境可写 cuda:0 / 0 / cuda。
     pt_device: str = "cpu"
     min_score: float = 0.25
@@ -373,7 +420,7 @@ class OnlineAppConfig:
     # - none：完全静默（不打印逐组球信息；适合追求吞吐或重定向到文件时）
     terminal_print_mode: _TERMINAL_PRINT_MODE = "best"
 
-    # 可选：周期性输出“状态心跳”，用于无球阶段确认程序仍在跑，以及观察吞吐。
+    # Optional：周期性输出“状态心跳”，用于无球阶段确认程序仍在跑，以及观察吞吐。
     # - 0 表示关闭（默认）。
     # - >0 表示每隔这么多秒打印一行统计。
     terminal_status_interval_s: float = 0.0
@@ -387,10 +434,10 @@ class OnlineAppConfig:
     time_mapping_min_points: int = 20
     time_mapping_hard_outlier_ms: float = 50.0
 
-    # 可选：轨迹拟合后处理（落点/落地时间/走廊）。默认 disabled。
+    # Optional：轨迹拟合后处理（落点/落地时间/走廊）。默认 disabled。
     curve: CurveStageConfig = CurveStageConfig()
 
-    # 可选：软件裁剪（动态 ROI）。
+    # Optional：软件裁剪（动态 ROI）。
     # 说明：
     # - 该裁剪发生在 detector 前，不需要逐帧修改相机 ROI 或标定。
     # - detector 输出 bbox 会自动加回裁剪 offset，保证下游仍是“原图像素坐标系”。
@@ -400,7 +447,7 @@ class OnlineAppConfig:
     detector_crop_max_step_px: int = 120
     detector_crop_reset_after_missed: int = 8
 
-    # 可选：相机侧 AOI（OffsetX/OffsetY）运行中平移。
+    # Optional：相机侧 AOI（OffsetX/OffsetY）运行中平移。
     # 说明：
     # - 该能力依赖具体机型/固件：有些机型 StartGrabbing 后会锁定 OffsetX/OffsetY。
     # - 一旦启用，**不要**对 calib 做 apply_sensor_roi_to_calibration 的一次性主点平移；
@@ -420,11 +467,16 @@ def load_offline_app_config(path: Path) -> OfflineAppConfig:
 
     data = _load_mapping(Path(path))
 
-    serials_raw = data.get("serials")
+    inp = data.get("input")
+    if not isinstance(inp, dict):
+        raise RuntimeError("offline config requires section 'input' (object)")
+    inp = cast(dict[str, Any], inp)
+
+    serials_raw = inp.get("serials")
     serials: list[str] | None = None
     if serials_raw is not None:
         if not isinstance(serials_raw, list) or not serials_raw:
-            raise RuntimeError("offline config field 'serials' must be a non-empty list")
+            raise RuntimeError("offline config field 'input.serials' must be a non-empty list")
         # 去重但保持顺序，避免用户写重复项导致误判数量。
         seen: set[str] = set()
         serials = []
@@ -435,32 +487,39 @@ def load_offline_app_config(path: Path) -> OfflineAppConfig:
             seen.add(s)
             serials.append(s)
         if not serials:
-            raise RuntimeError("offline config field 'serials' is empty after stripping")
+            raise RuntimeError("offline config field 'input.serials' is empty after stripping")
 
     curve = _as_curve_stage_config(data.get("curve"))
 
-    captures_dir = _as_path(data.get("captures_dir"))
-    time_sync_mode = _as_time_sync_mode(data.get("time_sync_mode"), "frame_host_timestamp")
-    time_mapping_path = _as_optional_path(data.get("time_mapping_path"))
+    captures_dir = _as_path(inp.get("captures_dir"))
+    calib_path = _as_path(inp.get("calib"))
+
+    run = _as_section(data, "run")
+    output = _as_section(data, "output")
+    det = _as_section(data, "detector")
+    time = _as_section(data, "time")
+
+    time_sync_mode = _as_time_sync_mode(time.get("sync_mode"), "frame_host_timestamp")
+    time_mapping_path = _as_optional_path(time.get("mapping_path"))
     if time_sync_mode == "dev_timestamp_mapping" and time_mapping_path is None:
         # 约定：若启用方案B但未显式指定映射文件，则默认在 captures_dir 下寻找。
         time_mapping_path = captures_dir / "time_mapping_dev_to_host_ms.json"
 
     return OfflineAppConfig(
         captures_dir=captures_dir,
-        calib=_as_path(data.get("calib")),
+        calib=calib_path,
         serials=serials,
-        detector=_as_detector(data.get("detector"), "color"),
-        model=_as_optional_path(data.get("model")),
-        pt_device=str(data.get("pt_device", "cpu") or "cpu").strip() or "cpu",
-        min_score=float(data.get("min_score", 0.25)),
-        require_views=int(data.get("require_views", 2)),
-        max_detections_per_camera=int(data.get("max_detections_per_camera", 10)),
-        max_reproj_error_px=float(data.get("max_reproj_error_px", 8.0)),
-        max_uv_match_dist_px=float(data.get("max_uv_match_dist_px", 25.0)),
-        merge_dist_m=float(data.get("merge_dist_m", 0.08)),
-        max_groups=int(data.get("max_groups", 0)),
-        out_jsonl=_as_path(data.get("out_jsonl", "data/tools_output/offline_positions_3d.jsonl")),
+        detector=_as_detector(det.get("name"), "color"),
+        model=_as_optional_path(det.get("model")),
+        pt_device=str(det.get("pt_device", "cpu") or "cpu").strip() or "cpu",
+        min_score=float(det.get("min_score", 0.25)),
+        require_views=int(det.get("require_views", 2)),
+        max_detections_per_camera=int(det.get("max_detections_per_camera", 10)),
+        max_reproj_error_px=float(det.get("max_reproj_error_px", 8.0)),
+        max_uv_match_dist_px=float(det.get("max_uv_match_dist_px", 25.0)),
+        merge_dist_m=float(det.get("merge_dist_m", 0.08)),
+        max_groups=int(run.get("max_groups", 0)),
+        out_jsonl=_as_path(output.get("out_jsonl", "data/tools_output/offline_positions_3d.jsonl")),
         time_sync_mode=time_sync_mode,
         time_mapping_path=time_mapping_path,
         curve=curve,
@@ -472,43 +531,57 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
 
     data = _load_mapping(Path(path))
 
-    serials_raw = data.get("serials")
-    if not isinstance(serials_raw, list) or not serials_raw:
-        raise RuntimeError("online config requires non-empty 'serials' list")
-    serials = [str(x).strip() for x in serials_raw if str(x).strip()]
+    sdk = _as_section(data, "sdk")
+    camera_raw = data.get("camera")
+    if not isinstance(camera_raw, dict):
+        raise RuntimeError("online config requires section 'camera' (object)")
+    camera = cast(dict[str, Any], camera_raw)
 
-    trig = data.get("trigger", {})
+    run = _as_section(data, "run")
+    det = _as_section(data, "detector")
+    output = _as_section(data, "output")
+    time = _as_section(data, "time")
+
+    serials_raw = camera.get("serials")
+    if not isinstance(serials_raw, list) or not serials_raw:
+        raise RuntimeError("online config requires non-empty 'camera.serials' list")
+    serials = [str(x).strip() for x in serials_raw if str(x).strip()]
+    if not serials:
+        raise RuntimeError("online config requires non-empty 'camera.serials' list (after stripping)")
+
+    trig = data.get("trigger")
     if trig is None:
         trig = {}
     if not isinstance(trig, dict):
         raise RuntimeError("online config field 'trigger' must be an object")
+    trig = cast(dict[str, Any], trig)
 
     trigger = OnlineTriggerConfig(
-        trigger_source=str(trig.get("trigger_source", data.get("trigger_source", "Software"))).strip(),
-        master_serial=str(trig.get("master_serial", data.get("master_serial", ""))).strip(),
-        master_line_out=str(trig.get("master_line_out", data.get("master_line_out", "Line1"))).strip(),
-        master_line_source=str(trig.get("master_line_source", data.get("master_line_source", ""))).strip(),
-        master_line_mode=str(trig.get("master_line_mode", data.get("master_line_mode", "Output"))).strip(),
-        soft_trigger_fps=float(trig.get("soft_trigger_fps", data.get("soft_trigger_fps", 5.0))),
-        trigger_activation=str(trig.get("trigger_activation", data.get("trigger_activation", "FallingEdge"))).strip(),
-        trigger_cache_enable=bool(trig.get("trigger_cache_enable", data.get("trigger_cache_enable", False))),
+        trigger_source=str(trig.get("trigger_source", "Software")).strip(),
+        master_serial=str(trig.get("master_serial", "")).strip(),
+        master_line_out=str(trig.get("master_line_out", "Line1")).strip(),
+        master_line_source=str(trig.get("master_line_source", "")).strip(),
+        master_line_mode=str(trig.get("master_line_mode", "Output")).strip(),
+        soft_trigger_fps=float(trig.get("soft_trigger_fps", 5.0)),
+        trigger_activation=str(trig.get("trigger_activation", "FallingEdge")).strip(),
+        trigger_cache_enable=bool(trig.get("trigger_cache_enable", False)),
     )
 
     curve = _as_curve_stage_config(data.get("curve"))
 
-    time_sync_mode = _as_time_sync_mode(data.get("time_sync_mode"), "frame_host_timestamp")
-    time_mapping_warmup_groups = int(data.get("time_mapping_warmup_groups", 20))
-    time_mapping_window_groups = int(data.get("time_mapping_window_groups", 200))
-    time_mapping_update_every_groups = int(data.get("time_mapping_update_every_groups", 5))
-    time_mapping_min_points = int(data.get("time_mapping_min_points", 20))
-    time_mapping_hard_outlier_ms = float(data.get("time_mapping_hard_outlier_ms", 50.0))
+    time_sync_mode = _as_time_sync_mode(time.get("sync_mode"), "frame_host_timestamp")
+    time_mapping_warmup_groups = int(time.get("mapping_warmup_groups", 20))
+    time_mapping_window_groups = int(time.get("mapping_window_groups", 200))
+    time_mapping_update_every_groups = int(time.get("mapping_update_every_groups", 5))
+    time_mapping_min_points = int(time.get("mapping_min_points", 20))
+    time_mapping_hard_outlier_ms = float(time.get("mapping_hard_outlier_ms", 50.0))
 
-    terminal_print_mode = _as_terminal_print_mode(data.get("terminal_print_mode"), "best")
-    terminal_status_interval_s = float(data.get("terminal_status_interval_s", 0.0))
+    terminal_print_mode = _as_terminal_print_mode(output.get("terminal_print_mode"), "best")
+    terminal_status_interval_s = float(output.get("terminal_status_interval_s", 0.0))
 
-    out_jsonl_only_when_balls = bool(data.get("out_jsonl_only_when_balls", False))
-    out_jsonl_flush_every_records = int(data.get("out_jsonl_flush_every_records", 1))
-    out_jsonl_flush_interval_s = float(data.get("out_jsonl_flush_interval_s", 0.0))
+    out_jsonl_only_when_balls = bool(output.get("out_jsonl_only_when_balls", False))
+    out_jsonl_flush_every_records = int(output.get("out_jsonl_flush_every_records", 1))
+    out_jsonl_flush_interval_s = float(output.get("out_jsonl_flush_interval_s", 0.0))
 
     # 约束：flush_every_records 必须为非负整数。
     # - 0 表示禁用“按条数 flush”，仅依赖 flush_interval_s 或最终 close。
@@ -520,36 +593,41 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
     if terminal_status_interval_s < 0:
         raise RuntimeError("online config terminal_status_interval_s must be >= 0")
 
-    pixel_format = str(data.get("pixel_format", "") or "").strip()
-    image_width = _as_optional_positive_int(data.get("image_width"))
-    image_height = _as_optional_positive_int(data.get("image_height"))
-    image_offset_x = _as_int(data.get("image_offset_x"), 0)
-    image_offset_y = _as_int(data.get("image_offset_y"), 0)
+    pixel_format = str(camera.get("pixel_format", "") or "").strip()
+    roi = _as_section(camera, "roi")
+    image_width = _as_optional_positive_int(roi.get("width"))
+    image_height = _as_optional_positive_int(roi.get("height"))
+    image_offset_x = _as_int(roi.get("offset_x"), 0)
+    image_offset_y = _as_int(roi.get("offset_y"), 0)
 
     # 曝光/增益：默认保持旧行为。
-    exposure_auto_raw = data.get("exposure_auto", "Off")
-    exposure_auto = "" if exposure_auto_raw is None else str(exposure_auto_raw).strip()
-    exposure_time_us = _as_optional_float(data.get("exposure_time_us", 10000.0))
-    gain_auto_raw = data.get("gain_auto", "Off")
-    gain_auto = "" if gain_auto_raw is None else str(gain_auto_raw).strip()
-    gain = _as_optional_float(data.get("gain", 12.0))
+    exposure = _as_section(camera, "exposure")
+    exposure_auto_raw = exposure.get("auto", "Off")
+    exposure_auto = _as_auto_mode_str(exposure_auto_raw)
+    exposure_time_us = _as_optional_float(exposure.get("time_us", 10000.0))
+    gain_section = _as_section(camera, "gain")
+    gain_auto_raw = gain_section.get("auto", "Off")
+    gain_auto = _as_auto_mode_str(gain_auto_raw)
+    gain = _as_optional_float(gain_section.get("value", 12.0))
 
     if exposure_time_us is not None and float(exposure_time_us) <= 0:
         raise RuntimeError("online config exposure_time_us must be > 0 (or null to disable)")
     if gain is not None and float(gain) < 0:
         raise RuntimeError("online config gain must be >= 0 (or null to disable)")
 
-    detector_crop_size = _as_int(data.get("detector_crop_size"), 0)
-    detector_crop_smooth_alpha = float(data.get("detector_crop_smooth_alpha", 0.2))
-    detector_crop_max_step_px = _as_int(data.get("detector_crop_max_step_px"), 120)
-    detector_crop_reset_after_missed = _as_int(data.get("detector_crop_reset_after_missed"), 8)
+    det_crop = _as_section(det, "crop")
+    detector_crop_size = _as_int(det_crop.get("size"), 0)
+    detector_crop_smooth_alpha = float(det_crop.get("smooth_alpha", 0.2))
+    detector_crop_max_step_px = _as_int(det_crop.get("max_step_px"), 120)
+    detector_crop_reset_after_missed = _as_int(det_crop.get("reset_after_missed"), 8)
 
-    camera_aoi_runtime = bool(data.get("camera_aoi_runtime", False))
-    camera_aoi_update_every_groups = _as_int(data.get("camera_aoi_update_every_groups"), 2)
-    camera_aoi_min_move_px = _as_int(data.get("camera_aoi_min_move_px"), 8)
-    camera_aoi_smooth_alpha = float(data.get("camera_aoi_smooth_alpha", 0.3))
-    camera_aoi_max_step_px = _as_int(data.get("camera_aoi_max_step_px"), 160)
-    camera_aoi_recenter_after_missed = _as_int(data.get("camera_aoi_recenter_after_missed"), 30)
+    aoi = _as_section(camera, "aoi")
+    camera_aoi_runtime = bool(aoi.get("runtime", False))
+    camera_aoi_update_every_groups = _as_int(aoi.get("update_every_groups"), 2)
+    camera_aoi_min_move_px = _as_int(aoi.get("min_move_px"), 8)
+    camera_aoi_smooth_alpha = float(aoi.get("smooth_alpha", 0.3))
+    camera_aoi_max_step_px = _as_int(aoi.get("max_step_px"), 160)
+    camera_aoi_recenter_after_missed = _as_int(aoi.get("recenter_after_missed"), 30)
 
     if detector_crop_size < 0:
         raise RuntimeError("online config detector_crop_size must be >= 0")
@@ -580,15 +658,15 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         )
 
     return OnlineAppConfig(
-        mvimport_dir=_as_optional_path(data.get("mvimport_dir")),
-        dll_dir=_as_optional_path(data.get("dll_dir")),
+        mvimport_dir=_as_optional_path(sdk.get("mvimport_dir")),
+        dll_dir=_as_optional_path(sdk.get("dll_dir")),
         serials=serials,
-        group_by=_as_group_by(data.get("group_by"), "frame_num"),
-        timeout_ms=int(data.get("timeout_ms", 1000)),
-        group_timeout_ms=int(data.get("group_timeout_ms", 1000)),
-        max_pending_groups=int(data.get("max_pending_groups", 256)),
-        max_groups=int(data.get("max_groups", 0)),
-        max_wait_seconds=float(data.get("max_wait_seconds", 0.0)),
+        group_by=_as_group_by(run.get("group_by"), "frame_num"),
+        timeout_ms=int(run.get("timeout_ms", 1000)),
+        group_timeout_ms=int(run.get("group_timeout_ms", 1000)),
+        max_pending_groups=int(run.get("max_pending_groups", 256)),
+        max_groups=int(run.get("max_groups", 0)),
+        max_wait_seconds=float(run.get("max_wait_seconds", 0.0)),
         pixel_format=pixel_format,
         image_width=image_width,
         image_height=image_height,
@@ -598,17 +676,17 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         exposure_time_us=(float(exposure_time_us) if exposure_time_us is not None else None),
         gain_auto=str(gain_auto),
         gain=(float(gain) if gain is not None else None),
-        calib=_as_path(data.get("calib", "data/calibration/example_triple_camera_calib.json")),
-        detector=_as_detector(data.get("detector"), "fake"),
-        model=_as_optional_path(data.get("model")),
-        pt_device=str(data.get("pt_device", "cpu") or "cpu").strip() or "cpu",
-        min_score=float(data.get("min_score", 0.25)),
-        require_views=int(data.get("require_views", 2)),
-        max_detections_per_camera=int(data.get("max_detections_per_camera", 10)),
-        max_reproj_error_px=float(data.get("max_reproj_error_px", 8.0)),
-        max_uv_match_dist_px=float(data.get("max_uv_match_dist_px", 25.0)),
-        merge_dist_m=float(data.get("merge_dist_m", 0.08)),
-        out_jsonl=_as_optional_path(data.get("out_jsonl")),
+        calib=_as_path(camera.get("calib", "data/calibration/example_triple_camera_calib.json")),
+        detector=_as_detector(det.get("name"), "fake"),
+        model=_as_optional_path(det.get("model")),
+        pt_device=str(det.get("pt_device", "cpu") or "cpu").strip() or "cpu",
+        min_score=float(det.get("min_score", 0.25)),
+        require_views=int(det.get("require_views", 2)),
+        max_detections_per_camera=int(det.get("max_detections_per_camera", 10)),
+        max_reproj_error_px=float(det.get("max_reproj_error_px", 8.0)),
+        max_uv_match_dist_px=float(det.get("max_uv_match_dist_px", 25.0)),
+        merge_dist_m=float(det.get("merge_dist_m", 0.08)),
+        out_jsonl=_as_optional_path(output.get("out_jsonl")),
         out_jsonl_only_when_balls=out_jsonl_only_when_balls,
         out_jsonl_flush_every_records=out_jsonl_flush_every_records,
         out_jsonl_flush_interval_s=out_jsonl_flush_interval_s,

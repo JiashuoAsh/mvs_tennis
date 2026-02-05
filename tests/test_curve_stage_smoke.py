@@ -133,9 +133,13 @@ def test_offline_config_accepts_curve_section(tmp_path: Path) -> None:
     cfg_path.write_text(
         json.dumps(
             {
-                "captures_dir": "data/captures_master_slave/tennis_test",
-                "calib": "data/calibration/example_triple_camera_calib.json",
-                "detector": "fake",
+                "input": {
+                    "captures_dir": "data/captures_master_slave/tennis_test",
+                    "calib": "data/calibration/example_triple_camera_calib.json",
+                },
+                "detector": {
+                    "name": "fake",
+                },
                 "curve": {
                     "enabled": True,
                     "max_tracks": 2,

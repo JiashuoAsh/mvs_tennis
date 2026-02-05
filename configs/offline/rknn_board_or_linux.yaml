@@ -1,0 +1,27 @@
+﻿# 离线 3D 定位配置（RKNN .rknn，通常用于 Rockchip 设备或 Linux 工具链）
+# 注意：Windows 上一般无法安装/运行 rknn 相关运行时库，因此仅作模板。
+
+input:
+  captures_dir: data/captures_master_slave/tennis_test
+  calib: data/calibration/example_triple_camera_calib.json
+
+detector:
+  name: rknn
+
+  # detector=rknn 时必填（.rknn）
+  model: data/models/tennis_20241227.rknn
+
+  min_score: 0.25
+  require_views: 2
+
+  # 多球鲁棒定位参数：
+  max_detections_per_camera: 10
+  max_reproj_error_px: 8.0
+  max_uv_match_dist_px: 25.0
+  merge_dist_m: 0.08
+
+run:
+  max_groups: 0
+
+output:
+  out_jsonl: data/tools_output/offline_positions_3d.rknn.jsonl

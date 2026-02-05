@@ -59,9 +59,11 @@ class TestOfflineConfigSerials(unittest.TestCase):
             p.write_text(
                 json.dumps(
                     {
-                        "captures_dir": "data/captures_master_slave/tennis_test",
-                        "calib": "data/calibration/example_triple_camera_calib.json",
-                        "serials": [" A ", "A", "B", ""],
+                        "input": {
+                            "captures_dir": "data/captures_master_slave/tennis_test",
+                            "calib": "data/calibration/example_triple_camera_calib.json",
+                            "serials": [" A ", "A", "B", ""],
+                        },
                     },
                     ensure_ascii=False,
                 ),
@@ -77,9 +79,11 @@ class TestOfflineConfigSerials(unittest.TestCase):
             p.write_text(
                 json.dumps(
                     {
-                        "captures_dir": "data/captures_master_slave/tennis_test",
-                        "calib": "data/calibration/example_triple_camera_calib.json",
-                        "serials": [],
+                        "input": {
+                            "captures_dir": "data/captures_master_slave/tennis_test",
+                            "calib": "data/calibration/example_triple_camera_calib.json",
+                            "serials": [],
+                        },
                     },
                     ensure_ascii=False,
                 ),

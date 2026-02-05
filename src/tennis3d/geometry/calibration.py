@@ -23,7 +23,7 @@ class CameraCalibration:
     name: str
     image_size: tuple[int, int]  # (width, height)
     K: np.ndarray  # (3, 3)
-    dist: np.ndarray  # (N,) 可选，当前不参与计算
+    dist: np.ndarray  # (N,) Optional，当前不参与计算
     R_wc: np.ndarray  # (3, 3)
     t_wc: np.ndarray  # (3,)
 

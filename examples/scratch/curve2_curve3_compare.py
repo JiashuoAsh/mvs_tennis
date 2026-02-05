@@ -61,7 +61,12 @@ class ObsPoint:
 
 
 def _estimate_observed_hit_on_plane_y(
-    points: list[ObsPoint], *, target_y: float, t_min_abs: float | None = None, pick: str = "first"
+    points: list[ObsPoint],
+    *,
+    target_y: float,
+    t_min_abs: float | None = None,
+    pick: str = "first",
+    direction: str = "any",
 ) -> dict[str, Any] | None:
     """从离散观测点中估计 y=target_y 平面处的交点（观测击球点）。
 
@@ -76,7 +81,11 @@ def _estimate_observed_hit_on_plane_y(
         points: 观测点序列（按时间递增）。
         target_y: 目标高度（米）。
         t_min_abs: 仅使用 t_abs >= t_min_abs 的点来估计（用于只取反弹后/第二段）。
-        pick: 在存在多个穿越时选择哪个：first=最早穿越（通常对应上升段），last=最晚穿越（通常对应下降段）。
+        pick: 在存在多个穿越时选择哪个：first=最早穿越，last=最晚穿越。
+        direction: 方向过滤：
+            - any：不区分方向（默认，兼容旧行为）
+            - up：只保留上升段穿越（y 随时间递增穿越 target_y）
+            - down：只保留下降段穿越（y 随时间递减穿越 target_y）
 
     Returns:
         估计结果字典（含 t_abs/x/y/z/method 等），若无点则返回 None。
@@ -96,7 +105,11 @@ def _estimate_observed_hit_on_plane_y(
 
     ty = float(target_y)
 
-    # 先收集所有穿越点，再按 pick 选择。
+    direction = str(direction).strip().lower() or "any"
+    if direction not in {"any", "up", "down"}:
+        raise ValueError(f"invalid direction={direction!r}, expected any/up/down")
+
+    # 先收集所有穿越点（含方向），再按 pick 选择。
     crosses: list[dict[str, Any]] = []
     for i in range(len(pts) - 1):
         p0 = pts[i]
@@ -129,12 +142,22 @@ def _estimate_observed_hit_on_plane_y(
                 "x": x,
                 "y": ty,
                 "z": z,
+                # 说明：用于区分上升/下降段穿越。
+                "direction": "up" if (y1 - y0) > 0.0 else "down",
             }
         )
+
+    if direction != "any":
+        crosses = [c for c in crosses if c.get("direction") == direction]
 
     pick = str(pick).strip().lower() or "first"
     if crosses:
         return crosses[0] if pick == "first" else crosses[-1]
+
+    # 说明：当调用方明确要求 up/down 方向时，如果观测点序列里不存在该方向的穿越，
+    # 这里返回 None 更符合语义；否则用“最近点”会把另一个方向的穿越/附近点误当成目标。
+    if direction != "any":
+        return None
 
     # 找不到穿越：取 |y-target_y| 最小的点。
     best_i = 0
@@ -260,6 +283,130 @@ def _extract_record_t_abs(rec: dict[str, Any], curve: dict[str, Any] | None) -> 
     return None
 
 
+def _pick_ball_for_track(
+    balls: Any,
+    *,
+    curve: dict[str, Any] | None,
+    track_id: int | None,
+) -> dict[str, Any] | None:
+    """在 balls 列表里选择与 track_id 对应的球。
+
+    说明：在线/离线日志可能同时包含多个 track 的球。离线对比时如果指定了 track_id，
+    这里必须严格匹配该 track，否则会把其它轨迹的点混入拟合，出现“前面一堆无用球也被拟合”。
+
+    Args:
+        balls: rec["balls"]，期望是 list[dict]。
+        curve: rec["curve"]，用于读取 assignments。
+        track_id: 目标 track_id；None 表示不做匹配，直接取第一个。
+
+    Returns:
+        选中的 ball 字典；找不到则返回 None。
+    """
+
+    if not isinstance(balls, list) or not balls:
+        return None
+
+    # 不指定 track：沿用旧行为，取第一个。
+    if track_id is None:
+        return balls[0] if isinstance(balls[0], dict) else None
+
+    tid = int(track_id)
+
+    # 1) 优先使用 ball.curve_track_id（在线日志里通常会带）。
+    for b in balls:
+        if not isinstance(b, dict):
+            continue
+        bt = _safe_int(b.get("curve_track_id"))
+        if bt is not None and int(bt) == tid:
+            return b
+
+    # 2) 回退：根据 curve.assignments 找到 ball_id->track_id 映射。
+    # assignments: [{"ball_id": 0, "track_id": 1, ...}, ...]
+    if isinstance(curve, dict):
+        assigns = curve.get("assignments")
+        if isinstance(assigns, list):
+            target_ball_ids: set[int] = set()
+            for a in assigns:
+                if not isinstance(a, dict):
+                    continue
+                at = _safe_int(a.get("track_id"))
+                if at is None or int(at) != tid:
+                    continue
+                bid = _safe_int(a.get("ball_id"))
+                if bid is not None:
+                    target_ball_ids.add(int(bid))
+
+            if target_ball_ids:
+                for b in balls:
+                    if not isinstance(b, dict):
+                        continue
+                    bid = _safe_int(b.get("ball_id"))
+                    if bid is not None and int(bid) in target_ball_ids:
+                        return b
+
+    return None
+
+
+def _guess_primary_track_id_from_track_updates(*, jsonl_path: Path, max_records: int) -> int | None:
+    """从 track_updates 中推断该 jsonl 的“主轨迹 track_id”。
+
+    背景：no-track 模式下，如果每条记录都“选本帧 n_obs 最大的 track_update”，会在
+    track1/track2 之间来回切换，最终把多条轨迹混成一条“怪物曲线”。
+
+    这里采用保守规则：选择全局 max(n_obs) 最大的 track；若相同则选出现次数更多的。
+
+    Args:
+        jsonl_path: 输入 jsonl。
+        max_records: 最多扫描 N 条记录（0 表示不限制）。
+
+    Returns:
+        推断出的主 track_id；若无法推断返回 None。
+    """
+
+    max_records = int(max_records)
+    seen = 0
+
+    # track_id -> (max_n_obs, count)
+    stats: dict[int, tuple[int, int]] = {}
+
+    for rec in iter_metadata_records(Path(jsonl_path)):
+        if not isinstance(rec, dict):
+            continue
+        seen += 1
+        if max_records > 0 and seen > max_records:
+            break
+
+        curve = rec.get("curve")
+        if not isinstance(curve, dict):
+            continue
+        tu = curve.get("track_updates")
+        if not isinstance(tu, list) or not tu:
+            continue
+
+        for u in tu:
+            if not isinstance(u, dict):
+                continue
+            tid = _safe_int(u.get("track_id"))
+            if tid is None:
+                continue
+            n_obs = _safe_int(u.get("n_obs"))
+            n_val = int(n_obs) if n_obs is not None else 0
+
+            prev = stats.get(int(tid))
+            if prev is None:
+                stats[int(tid)] = (n_val, 1)
+            else:
+                prev_max, prev_cnt = prev
+                stats[int(tid)] = (max(prev_max, n_val), prev_cnt + 1)
+
+    if not stats:
+        return None
+
+    # 先按 max_n_obs，再按 count。
+    best_tid, _ = max(stats.items(), key=lambda kv: (kv[1][0], kv[1][1]))
+    return int(best_tid)
+
+
 def _iter_track_points(
     *,
     jsonl_path: Path,
@@ -272,10 +419,10 @@ def _iter_track_points(
     """从 jsonl 中抽取一条轨迹的时序点序列。
 
     - 若指定 track_id：只抽取该 track。
-    - 若不指定 track_id：把整个 jsonl 当作“一球轨迹”，不按 track 过滤。
+    - 若不指定 track_id：自动推断主轨迹 track_id，并固定抽取该 track。
 
     约定：优先使用 `curve.track_updates[*].last_pos`（该字段通常已经包含 y 轴修正）。
-    如无法取得，则退化为 `balls[0].ball_3d_world` 并做保守的 y 轴符号修正。
+    如无法取得，则退化为 balls 中对应 track 的 `ball_3d_world`，并做保守的 y 轴符号修正。
 
     Args:
         jsonl_path: 输入 jsonl 路径。
@@ -302,9 +449,19 @@ def _iter_track_points(
     session_pick = str(session_pick).strip().lower() or "longest"
 
     point_source = str(point_source).strip().lower() or "auto"
+
+    # no-track 模式下，固定主 track，避免“每帧选 n_obs 最大的 track_update”导致的轨迹混合。
+    effective_track_id = track_id
+    if effective_track_id is None and point_source != "balls":
+        effective_track_id = _guess_primary_track_id_from_track_updates(
+            jsonl_path=Path(jsonl_path),
+            max_records=max_records,
+        )
+
     segments: list[list[ObsPoint]] = []
     cur: list[ObsPoint] = []
     last_t: float | None = None
+    last_n_obs: int | None = None
 
     seen = 0
     for rec in iter_metadata_records(Path(jsonl_path)):
@@ -324,8 +481,8 @@ def _iter_track_points(
 
         u: dict[str, Any] | None = None
         if point_source != "balls":
-            if track_id is not None:
-                u = _extract_track_update(curve, int(track_id))
+            if effective_track_id is not None:
+                u = _extract_track_update(curve, int(effective_track_id))
             else:
                 u = _extract_best_track_update(curve)
 
@@ -341,15 +498,22 @@ def _iter_track_points(
 
         if p3 is None and point_source in {"auto", "balls"}:
             balls = rec.get("balls")
-            if isinstance(balls, list) and balls:
-                b0 = balls[0]
-                if isinstance(b0, dict):
-                    p3 = _as_vec3(b0.get("ball_3d_world"))
-                    if p3 is not None:
-                        # 说明：部分输出的 world_y 方向与拟合所需的 y（高度）相反。
-                        # 这里用“若为负则取反”的保守规则，避免把高度当成负数。
-                        y = float(-p3[1]) if float(p3[1]) < 0.0 else float(p3[1])
-                        p3 = (float(p3[0]), y, float(p3[2]))
+            # 注意：当指定 track_id 时，balls 回退必须匹配该 track。
+            # 否则会把其它轨迹（例如 track1）的点混入 track2，导致离线拟合与可视化明显异常。
+            if effective_track_id is not None:
+                b0 = _pick_ball_for_track(balls, curve=curve, track_id=int(effective_track_id))
+            elif u is not None:
+                b0 = _pick_ball_for_track(balls, curve=curve, track_id=_safe_int(u.get("track_id")))
+            else:
+                b0 = _pick_ball_for_track(balls, curve=curve, track_id=None)
+
+            if isinstance(b0, dict):
+                p3 = _as_vec3(b0.get("ball_3d_world"))
+                if p3 is not None:
+                    # 说明：部分输出的 world_y 方向与拟合所需的 y（高度）相反。
+                    # 这里用“若为负则取反”的保守规则，避免把高度当成负数。
+                    y = float(-p3[1]) if float(p3[1]) < 0.0 else float(p3[1])
+                    p3 = (float(p3[0]), y, float(p3[2]))
             t_abs = float(t_abs_rec)
 
         if t_abs is None or p3 is None:
@@ -363,6 +527,15 @@ def _iter_track_points(
                 # 时间断层：开启新 session 段。
                 segments.append(cur)
                 cur = []
+
+        # 说明：同一 jsonl 内可能出现 track 结束后重新从 n_obs=1 开始的“新球”。
+        # 单靠时间 gap 可能捕捉不到（例如连续运行、时间戳连续）。这里用 n_obs 重置做切分。
+        if n_obs is not None:
+            n_val = int(n_obs)
+            if last_n_obs is not None and n_val == 1 and last_n_obs >= 5 and cur:
+                segments.append(cur)
+                cur = []
+            last_n_obs = n_val
 
         cur.append(ObsPoint(x=p3[0], y=p3[1], z=p3[2], t_abs=t_abs, n_obs=n_obs))
         last_t = t_abs
@@ -448,13 +621,21 @@ def _filter_user_return_points(points: list[ObsPoint]) -> tuple[list[ObsPoint], 
     """过滤掉回球段之前的点，并返回诊断信息。"""
 
     if not points:
-        return [], {"start_index": None, "reason": "no_points"}
+        return [], {"start_index": None, "reason": "no_points", "n_in": 0, "n_out": 0}
+
+    n_in = int(len(points))
 
     idx = _find_user_return_start_index(points, bot_z=0.0)
     if idx is None:
-        return points, {"start_index": None, "reason": "no_return_detected"}
+        return points, {
+            "start_index": None,
+            "reason": "no_return_detected",
+            "n_in": n_in,
+            "n_out": n_in,
+        }
 
-    return points[idx:], {"start_index": int(idx), "reason": "detected"}
+    out = points[idx:]
+    return out, {"start_index": int(idx), "reason": "detected", "n_in": n_in, "n_out": int(len(out))}
 
 
 def _finite_stats(values: np.ndarray) -> dict[str, float | int]:
@@ -639,8 +820,13 @@ def _curve3_point_at_abs_time(pred: CurvePredictorV3, t_abs: float) -> tuple[flo
     return float(p[0]), float(p[1]), float(p[2])
 
 
-def _run_curve2(points: list[ObsPoint]) -> CurveV2:
+def _run_curve2(points: list[ObsPoint], *, second_stage_y_fit_mode: str) -> CurveV2:
     curve = CurveV2()
+
+    # 说明：curve2 的第二段（id==1）Y 拟合策略现在支持可切换。
+    # 为了让离线对比更可控，这里由脚本参数显式决定使用哪种策略。
+    curve.set_second_stage_y_fit_mode(str(second_stage_y_fit_mode))
+
     # 说明：收敛曲线会对每个 prefix 重复拟合一次。curve2 的 legacy logger
     # 默认会输出大量 INFO，容易淹没真正的错误信息；离线工具中直接禁用。
     curve.logger.disabled = True
@@ -2200,18 +2386,148 @@ def _subset_by_post_n(
     )
 
 
+def _estimate_bounce_t_abs_from_observed(points: list[ObsPoint]) -> float | None:
+    """从观测点估计反弹（落地）时刻的绝对时间戳。
+
+    背景：
+        脚本会用 bounce_t_abs_full 把点序列切成 pre/post，并支持 postN（反弹后点数）。
+        正常情况下 bounce_t_abs_full 来自 curve3 的 `predicted_land_point()`（即 bounce_event）。
+        但在某些数据里（坐标系地面高度偏置、bounce 检测失败、或轨迹质量较差），
+        curve3 给出的反弹时刻可能明显晚于真实反弹，从而导致“post 点数很少/为空”，
+        继而出现 post3/5/7/9/11 全部被跳过的现象。
+
+        为了让离线可视化更鲁棒，这里提供一个纯观测的兜底估计：选择 y 的局部最小值
+        （且接下来 y 开始回升）作为反弹时刻。
+
+    Args:
+        points: 按时间递增的观测点。
+
+    Returns:
+        估计的反弹绝对时刻（秒），不可用时返回 None。
+    """
+
+    if len(points) < 5:
+        return None
+
+    ys = np.asarray([float(p.y) for p in points], dtype=float)
+    ts = np.asarray([float(p.t_abs) for p in points], dtype=float)
+    m = np.isfinite(ys) & np.isfinite(ts)
+    if int(np.sum(m)) < 5:
+        return None
+
+    ys = ys[m]
+    ts = ts[m]
+    n = int(ys.size)
+    if n < 5:
+        return None
+
+    # 候选：局部极小点，且后续存在上升趋势。
+    cand: list[int] = []
+    for i in range(1, n - 2):
+        if ys[i] <= ys[i - 1] and ys[i] <= ys[i + 1]:
+            # 简单上升判据：后两步至少有一步明显上升，避免平坦噪声。
+            if (ys[i + 1] - ys[i] > 1e-4) or (ys[i + 2] - ys[i] > 1e-4):
+                cand.append(int(i))
+
+    if not cand:
+        return None
+
+    # 多个极小点时，优先选“最早且足够接近全局最小 y”的那个，避免选到第二次落地。
+    y_min = float(np.min(ys))
+    # 说明：阈值用 8cm 经验值，足以覆盖常见测量噪声/坐标偏置。
+    y_close_th = float(y_min + 0.08)
+    early = [i for i in cand if float(ys[i]) <= y_close_th]
+    i_pick = int(min(early) if early else min(cand, key=lambda i: float(ys[i])))
+    t_pick = float(ts[i_pick])
+    return t_pick if math.isfinite(t_pick) else None
+
+
+def _choose_bounce_t_abs(
+    *,
+    points: list[ObsPoint],
+    bounce_curve3_t_abs: float | None,
+    bounce_observed_t_abs: float | None,
+    post_ns: list[int],
+) -> tuple[float | None, dict[str, Any]]:
+    """选择用于 pre/post 切分的 bounce 时刻，并返回诊断信息。"""
+
+    diag: dict[str, Any] = {
+        "curve3": None if bounce_curve3_t_abs is None else float(bounce_curve3_t_abs),
+        "observed": None if bounce_observed_t_abs is None else float(bounce_observed_t_abs),
+        "picked": None,
+        "source": None,
+        "n_post_curve3": None,
+        "n_post_observed": None,
+    }
+
+    if not points:
+        return None, diag
+
+    t_last = float(points[-1].t_abs)
+    max_post_n = int(max(post_ns)) if post_ns else 0
+
+    def n_post(t_b: float | None) -> int | None:
+        if t_b is None or not math.isfinite(float(t_b)):
+            return None
+        return int(sum(1 for p in points if float(p.t_abs) > float(t_b)))
+
+    n_post_c3 = n_post(bounce_curve3_t_abs)
+    n_post_obs = n_post(bounce_observed_t_abs)
+    diag["n_post_curve3"] = n_post_c3
+    diag["n_post_observed"] = n_post_obs
+
+    # 规则：
+    # - curve3 可用且能提供足够 post 点时，优先用 curve3。
+    # - 若 curve3 给出的反弹时刻过晚（导致 post 点数不足），且观测兜底能提供更多 post 点，
+    #   则切换到观测估计。
+    # - 额外：若 curve3 的反弹时刻非常接近序列末端，也视为可疑。
+
+    if bounce_curve3_t_abs is not None and math.isfinite(float(bounce_curve3_t_abs)):
+        # 若能覆盖用户请求的最大 postN，则直接采用。
+        if n_post_c3 is not None and n_post_c3 >= max_post_n:
+            diag["picked"] = float(bounce_curve3_t_abs)
+            diag["source"] = "curve3"
+            return float(bounce_curve3_t_abs), diag
+
+        # 可疑：反弹发生在最后 0.15s 内，且导致 post 点数很少。
+        if float(t_last - float(bounce_curve3_t_abs)) < 0.15:
+            pass
+
+    # 尝试使用观测兜底。
+    if bounce_observed_t_abs is not None and math.isfinite(float(bounce_observed_t_abs)):
+        if n_post_obs is not None and (n_post_c3 is None or n_post_obs > n_post_c3):
+            diag["picked"] = float(bounce_observed_t_abs)
+            diag["source"] = "observed"
+            return float(bounce_observed_t_abs), diag
+
+    # 最后兜底：能用哪个用哪个。
+    if bounce_curve3_t_abs is not None and math.isfinite(float(bounce_curve3_t_abs)):
+        diag["picked"] = float(bounce_curve3_t_abs)
+        diag["source"] = "curve3"
+        return float(bounce_curve3_t_abs), diag
+    if bounce_observed_t_abs is not None and math.isfinite(float(bounce_observed_t_abs)):
+        diag["picked"] = float(bounce_observed_t_abs)
+        diag["source"] = "observed"
+        return float(bounce_observed_t_abs), diag
+
+    return None, diag
+
+
 def _build_report(
     *,
     points: list[ObsPoint],
     track_id: int | None,
     target_y: float,
     post_ns: list[int],
+    curve2_second_stage_y_fit_mode: str,
     plot_curve3: bool = True,
 ) -> dict[str, Any]:
     if not points:
         raise ValueError("no points")
 
-    # curve3：为了与线上 legacy 输出对齐，这里把 bounce_contact_y 固定为 0。
+    # curve3：bounce_contact_y 表示“触地高度”。
+    # 说明：历史上这里固定为 0 以对齐线上 legacy 输出，但离线数据可能存在地面高度偏置。
+    # 若一味固定为 0，curve3 可能把反弹时刻估计得过晚，导致 post 点数不足，从而 postN 输出为空。
     cfg3 = CurveV3Config(bounce_contact_y_m=0.0)
 
     # 说明：当用户关闭 curve3 时，我们仍然需要一个“bounce 时刻”的估计用于切分 pre/post。
@@ -2222,7 +2538,14 @@ def _build_report(
     # 全量拟合（用于估计 bounce_t_abs_full + 收敛曲线的 post 计数）。
     pred3_full = _run_curve3(points, cfg=cfg3)
     land3_full = _curve3_predicted_land(pred3_full)
-    bounce_t_abs_full = None if land3_full is None else float(land3_full["t_abs"])
+    bounce_t_abs_curve3 = None if land3_full is None else float(land3_full["t_abs"])
+    bounce_t_abs_observed = _estimate_bounce_t_abs_from_observed(points)
+    bounce_t_abs_full, bounce_diag = _choose_bounce_t_abs(
+        points=points,
+        bounce_curve3_t_abs=bounce_t_abs_curve3,
+        bounce_observed_t_abs=bounce_t_abs_observed,
+        post_ns=post_ns,
+    )
 
     # 采样时间网格：覆盖观测区间，并向后延展一些，便于看“预测段”。
     t0_abs = float(points[0].t_abs)
@@ -2256,7 +2579,7 @@ def _build_report(
                 "samples": {"t_abs": [], "x": [], "y": [], "z": []},
             }
 
-        curve2 = _run_curve2(subset)
+        curve2 = _run_curve2(subset, second_stage_y_fit_mode=curve2_second_stage_y_fit_mode)
         land2 = _curve2_predicted_land(curve2)
         hit2_up = _curve2_hit_on_plane(curve2, target_y=target_y, pick="up")
         hit2_down = _curve2_hit_on_plane(curve2, target_y=target_y, pick="down")
@@ -2309,7 +2632,7 @@ def _build_report(
             land3 = None
             hit3 = None
 
-        curve2 = _run_curve2(prefix)
+        curve2 = _run_curve2(prefix, second_stage_y_fit_mode=curve2_second_stage_y_fit_mode)
         land2 = _curve2_predicted_land(curve2)
         hit2_up = _curve2_hit_on_plane(curve2, target_y=target_y, pick="up")
         hit2_down = _curve2_hit_on_plane(curve2, target_y=target_y, pick="down")
@@ -2387,12 +2710,14 @@ def _build_report(
             target_y=target_y,
             t_min_abs=float(bounce_t_abs_full) - t_margin,
             pick="first",
+            direction="up",
         )
         observed_hit_post_down = _estimate_observed_hit_on_plane_y(
             points,
             target_y=target_y,
             t_min_abs=float(bounce_t_abs_full) - t_margin,
             pick="last",
+            direction="down",
         )
     else:
         # 没有 bounce 时间时无法稳定切分 pre/post，保守输出一个“全局”穿越点。
@@ -2496,6 +2821,7 @@ def _build_report(
             "track_label": "no-track" if track_id is None else str(int(track_id)),
             "target_y": float(target_y),
             "plot": {"curve3": bool(plot_curve3), "curve2": True},
+            "bounce_t_abs": bounce_diag,
         },
         "summary": summary,
         "bounce_t_abs_full": bounce_t_abs_full,
@@ -2599,6 +2925,13 @@ def main(argv: list[str] | None = None) -> int:
         default=False,
         help="禁用 curve3（PNG/HTML 不画；并跳过大部分 curve3 计算，仅保留一次全量拟合用于估计 bounce 时刻）",
     )
+
+    p.add_argument(
+        "--curve2-second-stage-y-fit-mode",
+        choices=["joint", "stage_only"],
+        default="stage_only",
+        help="curve2 第二段（id==1）Y 拟合策略：joint=旧的跨反弹联合拟合；stage_only=只用第二段点拟合",
+    )
     p.add_argument(
         "--out-json",
         default="",
@@ -2655,6 +2988,7 @@ def main(argv: list[str] | None = None) -> int:
         track_id=track_id,
         target_y=target_y,
         post_ns=post_ns,
+        curve2_second_stage_y_fit_mode=str(args.curve2_second_stage_y_fit_mode),
         plot_curve3=not bool(args.disable_curve3),
     )
     report["meta"]["post_ns"] = [int(x) for x in post_ns]
@@ -2667,6 +3001,7 @@ def main(argv: list[str] | None = None) -> int:
     report["meta"]["point_source"] = str(args.point_source)
     report["meta"]["filter"] = filter_info
     report["meta"]["disable_curve3"] = bool(args.disable_curve3)
+    report["meta"]["curve2_second_stage_y_fit_mode"] = str(args.curve2_second_stage_y_fit_mode)
 
     track_tag = "no-track" if track_id is None else f"track{int(track_id)}"
     out_json = Path(args.out_json) if str(args.out_json).strip() else Path("temp") / f"curve2_curve3_compare.{track_tag}.json"

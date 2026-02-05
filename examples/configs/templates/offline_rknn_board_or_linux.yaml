@@ -1,34 +1,40 @@
 ﻿# 离线 3D 定位配置模板（RKNN .rknn，通常用于 Rockchip 设备或 Linux 工具链）
 # 注意：Windows 上一般无法安装/运行 rknn 相关运行时库。
 
-captures_dir: <PATH_TO_CAPTURES_DIR>
-calib: <PATH_TO_CALIB_JSON_OR_YAML>
+input:
+  captures_dir: <PATH_TO_CAPTURES_DIR>
+  calib: <PATH_TO_CALIB_JSON_OR_YAML>
 
-detector: rknn
+detector:
+  name: rknn
 
-# detector=rknn 时必填（.rknn）
-model: <PATH_TO_MODEL_RKNN>
+  # detector=rknn 时必填（.rknn）
+  model: <PATH_TO_MODEL_RKNN>
 
-min_score: 0.25
-require_views: 2
+  min_score: 0.25
+  require_views: 2
 
-# 多球鲁棒定位参数：
-max_detections_per_camera: 10
-max_reproj_error_px: 8.0
-max_uv_match_dist_px: 25.0
-merge_dist_m: 0.08
-max_groups: 0
+  # 多球鲁棒定位参数：
+  max_detections_per_camera: 10
+  max_reproj_error_px: 8.0
+  max_uv_match_dist_px: 25.0
+  merge_dist_m: 0.08
 
-# 输出 JSONL 路径（每行一个结果记录）。默认值如下：
-out_jsonl: data/tools_output/offline_positions_3d.jsonl
+run:
+  max_groups: 0
 
-# 时间轴（默认值：frame_host_timestamp）
-time_sync_mode: frame_host_timestamp
+output:
+  # 输出 JSONL 路径（每行一个结果记录）。默认值如下：
+  out_jsonl: data/tools_output/offline_positions_3d.jsonl
 
-# 可选：映射文件路径。
-# - 仅在 time_sync_mode=dev_timestamp_mapping 时生效
-# - 为空表示使用默认路径：<captures_dir>/time_mapping_dev_to_host_ms.json
-time_mapping_path: ""
+time:
+  # 时间轴（默认值：frame_host_timestamp）
+  sync_mode: frame_host_timestamp
+
+  # 可选：映射文件路径。
+  # - 仅在 sync_mode=dev_timestamp_mapping 时生效
+  # - 为空表示使用默认路径：<captures_dir>/time_mapping_dev_to_host_ms.json
+  mapping_path: ""
 
 # 可选：轨迹拟合后处理（curve v3）。默认 disabled。
 curve:

@@ -2,7 +2,7 @@
 
 该模块是在线模式的“薄入口层”，只负责：
 - 解析 CLI 参数
-- （可选）加载配置文件
+- （Optional）加载配置文件
 - 构建运行规格并校验
 - 调用运行循环 `tennis3d.apps.online.runtime.run_online`
 

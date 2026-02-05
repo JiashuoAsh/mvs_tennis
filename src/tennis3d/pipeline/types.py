@@ -30,7 +30,7 @@ class ReprojectionError(TypedDict):
 
 
 class DetectionDetails(TypedDict):
-    """每相机被选中 detection 的详细信息（可选输出）。"""
+    """每相机被选中 detection 的详细信息（Optional输出）。"""
 
     bbox: list[float]  # [x1, y1, x2, y2]
     score: float
@@ -74,7 +74,7 @@ class FusedBall(TypedDict):
     # 主要输出：世界坐标 3D 点（米）
     ball_3d_world: list[float]  # [x, y, z]
 
-    # 可选增强：每相机坐标系下的 3D 点（米），用于诊断/可视化。
+    # Optional增强：每相机坐标系下的 3D 点（米），用于诊断/可视化。
     ball_3d_camera: dict[str, list[float]]
 
     used_cameras: list[str]
@@ -88,7 +88,7 @@ class FusedBall(TypedDict):
     max_reproj_error_px: float
     reprojection_errors: list[ReprojectionError]
 
-    # 可选：每相机用于该 ball 的 detection 详情（若上游开启 include_detection_details）。
+    # Optional：每相机用于该 ball 的 detection 详情（若上游开启 include_detection_details）。
     detections: NotRequired[dict[str, DetectionDetails]]
 
     # 新增：每相机 2D 观测与协方差。

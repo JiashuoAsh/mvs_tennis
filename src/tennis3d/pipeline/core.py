@@ -123,12 +123,21 @@ def run_localization_pipeline(
         aligner = PassthroughAligner()
 
     for meta, images_by_camera in groups:
+        # 说明：延迟诊断统一使用主机单调时钟（monotonic）。
+        # - 适用于统计处理耗时/排队积压/抖动；
+        # - 不受系统时间校时（NTP/手动改时）影响；
+        # - 与 capture_t_abs（epoch）不是同一时间轴，二者不要直接相减。
+        t_pipe_start = time.monotonic()
+
         aligned = aligner.align(meta or {}, images_by_camera or {})
         if aligned is None:
             continue
         meta, images_by_camera = aligned
 
+        t_after_align = time.monotonic()
+
         detections_by_camera = {}
+        detect_ms_by_camera: dict[str, float] = {}
         for serial, img in images_by_camera.items():
             if img is None:
                 continue
@@ -149,16 +158,39 @@ def run_localization_pipeline(
                     img_for_det = img
                     offset_xy = (0, 0)
 
+            # 说明：detect 的耗时通常是在线模式最主要的时延来源之一。
+            # 这里记录每相机 detect 的 host monotonic 耗时（毫秒），便于定位瓶颈。
+            _t_det0 = time.monotonic()
             dets = detector.detect(img_for_det)
+            _t_det1 = time.monotonic()
+            try:
+                detect_ms_by_camera[str(serial)] = float(1000.0 * max(0.0, _t_det1 - _t_det0))
+            except Exception:
+                pass
             if dets and (offset_xy[0] != 0 or offset_xy[1] != 0):
+                # 关键点：offset_xy 的语义应当是“回写到标定坐标系”。
+                # - software crop：回写到相机输出图像坐标系（通常等于标定 image_size）。
+                # - runtime AOI：回写到满幅标定坐标系（大于当前 AOI 图像尺寸）。
+                # 因此 clip_shape 必须按标定的 image_size，而不能用当前 img.shape（AOI 尺寸），
+                # 否则 offset 加回后会被错误截断，导致重投影误差/三角化直接崩溃。
+                clip_shape = None
+                try:
+                    cam_calib = calib.require(str(serial))
+                    w_calib, h_calib = cam_calib.image_size  # (W,H)
+                    clip_shape = (int(h_calib), int(w_calib))
+                except Exception:
+                    # 防御性回退：标定缺失/异常时，仍按当前图像尺寸裁剪，保持旧行为。
+                    clip_shape = (int(img.shape[0]), int(img.shape[1]))
                 dets = shift_detections(
                     list(dets),
                     dx=int(offset_xy[0]),
                     dy=int(offset_xy[1]),
-                    clip_shape=(int(img.shape[0]), int(img.shape[1])),
+                    clip_shape=clip_shape,
                 )
             if dets:
                 detections_by_camera[str(serial)] = list(dets)
+
+        t_after_detect = time.monotonic()
 
         locs = localize_balls(
             calib=calib,
@@ -170,6 +202,8 @@ def run_localization_pipeline(
             max_uv_match_dist_px=float(max_uv_match_dist_px),
             merge_dist_m=float(merge_dist_m),
         )
+
+        t_after_localize = time.monotonic()
 
         balls_out: list[dict[str, Any]] = []
         for i, loc in enumerate(locs):
@@ -308,6 +342,19 @@ def run_localization_pipeline(
         out_rec: dict[str, Any] = {
             "created_at": time.time(),
             **(meta or {}),
+            # 说明：latency_host 仅用于诊断；字段稳定、可 JSON 序列化。
+            "latency_host": {
+                "pipe_start_monotonic": float(t_pipe_start),
+                "after_align_monotonic": float(t_after_align),
+                "after_detect_monotonic": float(t_after_detect),
+                "after_localize_monotonic": float(t_after_localize),
+                "pipe_end_monotonic": float(time.monotonic()),
+                "align_ms": float(1000.0 * max(0.0, t_after_align - t_pipe_start)),
+                "detect_ms": float(1000.0 * max(0.0, t_after_detect - t_after_align)),
+                "localize_ms": float(1000.0 * max(0.0, t_after_localize - t_after_detect)),
+                "total_ms": float(1000.0 * max(0.0, time.monotonic() - t_pipe_start)),
+                "detect_ms_by_camera": dict(detect_ms_by_camera),
+            },
             "balls": balls_out,
         }
 

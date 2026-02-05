@@ -62,6 +62,9 @@ class _Track:
     # v3 可用的“落地时间”缓存（用于 episode 结束判定）
     predicted_land_time_abs: float | None = None
 
+    # v3 可用的“第二次落地时间”缓存（用于 episode 覆盖两段后再结束）
+    predicted_second_land_time_abs: float | None = None
+
     # 最近观测缓存（用于 episode 判定/重放）
     recent: deque[_RecentObs] = field(default_factory=deque)
 

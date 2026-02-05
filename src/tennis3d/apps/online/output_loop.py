@@ -3,8 +3,8 @@
 职责：
 - 消费 core pipeline 产出的 records（dict）。
 - 计数（records/balls）、周期性状态输出（proc_fps/cap_fps/lag/loop_ms）。
-- 可选写 JSONL。
-- 可选把球结果打印到终端。
+- Optional写 JSONL。
+- Optional把球结果打印到终端。
 
 说明：
 - 该模块属于 apps/entry 层（I/O 与人类可读输出），不应被 core 反向依赖。

@@ -24,12 +24,25 @@ class TestCalibrationFuseParamsJson(unittest.TestCase):
     def test_fuse_matches_repo_reference(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
 
-        intr_dir = repo_root / "data" / "calibration" / "inputs" / "2026-01-30"
-        # 说明：仓库内的参考文件 camera_extrinsics_C_T_B.json 是通过 tools/generate_camera_extrinsics.py
-        # 融合 intr_dir 与 data/calibration/base_to_camera_extrinsics.json 生成的。
-        # 因此该测试应当使用同一份外参来源，避免“参考文件已更新但 inputs 目录下旧外参未同步”的漂移。
-        extr_file = repo_root / "data" / "calibration" / "base_to_camera_extrinsics.json"
         ref_file = repo_root / "data" / "calibration" / "camera_extrinsics_C_T_B.json"
+        ref = json.loads(ref_file.read_text(encoding="utf-8"))
+
+        # 说明：仓库内的参考文件 camera_extrinsics_C_T_B.json 是通过 tools/generate_camera_extrinsics.py 生成的。
+        # 为了避免“参考文件已更新但测试仍固定旧 inputs 目录”的漂移，这里从参考文件的 source 字段读取输入来源。
+        source = ref.get("source", {})
+        if not isinstance(source, dict):
+            raise AssertionError("reference file field 'source' must be an object")
+
+        intr_dir_s = str(source.get("intrinsics_dir", "")).strip()
+        extr_file_s = str(source.get("extrinsics_file", "")).strip()
+        generated_at = str(source.get("generated_at", "")).strip() or ""
+        if not intr_dir_s:
+            raise AssertionError("reference file source.intrinsics_dir is missing")
+        if not extr_file_s:
+            raise AssertionError("reference file source.extrinsics_file is missing")
+
+        intr_dir = repo_root / Path(intr_dir_s)
+        extr_file = repo_root / Path(extr_file_s)
 
         intr = load_intrinsics_dir(intr_dir)
         extr = load_extrinsics_C_T_B(extr_file)
@@ -50,14 +63,12 @@ class TestCalibrationFuseParamsJson(unittest.TestCase):
             source=FuseSourceInfo(
                 intrinsics_dir=str(intr_dir).replace("\\", "/"),
                 extrinsics_file=str(extr_file).replace("\\", "/"),
-                generated_at="2026-01-30",
+                generated_at=generated_at,
             ),
             units="m",
             version=1,
             notes="",
         )
-
-        ref = json.loads(ref_file.read_text(encoding="utf-8"))
 
         self.assertIn("cameras", payload)
         self.assertIn("cameras", ref)

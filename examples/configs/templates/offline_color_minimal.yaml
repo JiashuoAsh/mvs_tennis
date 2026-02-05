@@ -7,54 +7,59 @@
 # 用法示例：
 # - uv run python -m tennis3d.apps.offline_localize_from_captures --config examples/configs/templates/offline_color_minimal.yaml
 
-# captures 目录：要求包含 metadata.jsonl（由 python -m mvs.apps.quad_capture 生成）
-# 说明：这里写占位符，使用前请替换为你的实际目录。
-captures_dir: <PATH_TO_CAPTURES_DIR>
+input:
+  # captures 目录：要求包含 metadata.jsonl（由 python -m mvs.apps.quad_capture 生成）
+  # 说明：这里写占位符，使用前请替换为你的实际目录。
+  captures_dir: <PATH_TO_CAPTURES_DIR>
 
-# 标定文件：支持 .json/.yaml/.yml（字段见 examples/configs/templates/calibration_multi_camera.yaml）
-# 说明：在线/离线 pipeline 默认用“相机 serial 字符串”作为 camera_name，所以标定文件 cameras 的 key 也建议用 serial。
-calib: <PATH_TO_CALIB_JSON_OR_YAML>
+  # 标定文件：支持 .json/.yaml/.yml（字段见 examples/configs/templates/calibration_multi_camera.yaml）
+  # 说明：在线/离线 pipeline 默认用“相机 serial 字符串”作为 camera_name，所以标定文件 cameras 的 key 也建议用 serial。
+  calib: <PATH_TO_CALIB_JSON_OR_YAML>
 
-# 检测器后端：fake|color|rknn|pt
-# - color：基于 HSV 的“绿色球/亮色目标”阈值检测，用于链路验证
-# - fake：直接读入或生成假检测（更偏单元/冒烟）
-detector: color
+detector:
+  # 检测器后端：fake|color|rknn|pt
+  # - color：基于 HSV 的“绿色球/亮色目标”阈值检测，用于链路验证
+  # - fake：直接读入或生成假检测（更偏单元/冒烟）
+  name: color
 
-# color/fake 不需要模型路径；留空即可（空字符串会被当作 None）
-model: ""
+  # color/fake 不需要模型路径；留空即可（空字符串会被当作 None）
+  model: ""
 
-# 置信度阈值：作为 pipeline 的 min_score（颜色检测通常会给固定分数）
-min_score: 0.25
+  # 置信度阈值：作为 pipeline 的 min_score（颜色检测通常会给固定分数）
+  min_score: 0.25
 
-# 至少需要几路相机同时检测到目标才输出 3D
-require_views: 2
+  # 至少需要几路相机同时检测到目标才输出 3D
+  require_views: 2
 
-# 多球鲁棒定位参数（即使你当前只关心“最小链路”，也建议保留这些字段，便于后续调参）：
-# - 每路相机最多取 topK 个候选参与跨视角匹配（防止组合爆炸）
-max_detections_per_camera: 10
+  # 多球鲁棒定位参数（即使你当前只关心“最小链路”，也建议保留这些字段，便于后续调参）：
+  # - 每路相机最多取 topK 个候选参与跨视角匹配（防止组合爆炸）
+  max_detections_per_camera: 10
 
-# - 3D 候选的最大重投影误差阈值（像素），越小越严格、误检越少
-max_reproj_error_px: 8.0
+  # - 3D 候选的最大重投影误差阈值（像素），越小越严格、误检越少
+  max_reproj_error_px: 8.0
 
-# - 把 3D 点投影到某相机后，与该相机检测框中心匹配的最大距离（像素）
-max_uv_match_dist_px: 25.0
+  # - 把 3D 点投影到某相机后，与该相机检测框中心匹配的最大距离（像素）
+  max_uv_match_dist_px: 25.0
 
-# - 3D 去重阈值（米）：不同相机组合可能得到同一球的重复解
-merge_dist_m: 0.08
+  # - 3D 去重阈值（米）：不同相机组合可能得到同一球的重复解
+  merge_dist_m: 0.08
 
-# 最多处理多少个 group（0 表示不限）
-max_groups: 0
+run:
+  # 最多处理多少个 group（0 表示不限）
+  max_groups: 0
 
-# 输出 JSONL 路径（每行一个 3D 定位结果）。默认值如下：
-out_jsonl: data/tools_output/offline_positions_3d.jsonl
+output:
+  # 输出 JSONL 路径（每行一个 3D 定位结果）。默认值如下：
+  out_jsonl: data/tools_output/offline_positions_3d.jsonl
 
-# 时间轴（默认值：frame_host_timestamp）
-time_sync_mode: frame_host_timestamp
+time:
+  # 时间轴（默认值：frame_host_timestamp）
+  sync_mode: frame_host_timestamp
 
-# 可选：映射文件路径。
-# - 仅在 time_sync_mode=dev_timestamp_mapping 时生效
-# - 为空表示使用默认路径：<captures_dir>/time_mapping_dev_to_host_ms.json
-time_mapping_path: ""
+  # 可选：映射文件路径。
+  # - 仅在 sync_mode=dev_timestamp_mapping 时生效
+  # - 为空表示使用默认路径：<captures_dir>/time_mapping_dev_to_host_ms.json
+  mapping_path: ""
 
 # 可选：轨迹拟合后处理（curve v3）。默认 disabled。
 curve:

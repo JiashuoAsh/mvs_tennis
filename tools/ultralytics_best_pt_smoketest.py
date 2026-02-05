@@ -59,26 +59,25 @@ if _SRC_DIR.exists():
 
 
 def _iter_capture_groups(metadata_path: Path) -> Iterator[dict[str, Any]]:
-    """迭代 metadata.jsonl 中的 group 记录（含 frames 字段）。"""
+    """迭代 metadata.jsonl 中的 group 记录（含 frames 字段）。
 
-    with metadata_path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-            except Exception:
-                continue
+    说明：
+        - 本仓库的 metadata 文件历史上既可能是严格 JSONL（每行一个对象），
+          也可能被 pretty-print 成“多行一个对象”。
+        - 为避免工具脚本对格式过于敏感，这里复用 `mvs.session.metadata_io.iter_metadata_records`
+          做稳健解析。
+    """
 
-            if not isinstance(rec, dict):
-                continue
-            if "frames" not in rec:
-                continue
-            frames = rec.get("frames")
-            if not isinstance(frames, list) or not frames:
-                continue
-            yield rec
+    # 延迟 import：保证脚本仍可独立运行，并复用仓库内的稳健解析逻辑。
+    from mvs.session.metadata_io import iter_metadata_records
+
+    for rec in iter_metadata_records(Path(metadata_path)):
+        if not isinstance(rec, dict):
+            continue
+        frames = rec.get("frames")
+        if not isinstance(frames, list) or not frames:
+            continue
+        yield rec
 
 
 def _resolve_image_path(repo_root: Path, captures_dir: Path, file_field: str) -> Path:
@@ -218,47 +217,41 @@ def _pick_first_image_from_captures(captures_dir: Path) -> Path:
 
     repo_root = REPO_ROOT
 
-    with meta_path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
+    # 说明：metadata 可能是多行对象格式，必须使用稳健解析。
+    from mvs.session.metadata_io import iter_metadata_records
+
+    for rec in iter_metadata_records(meta_path):
+        # 只关心 group 记录
+        if not isinstance(rec, dict) or "frames" not in rec:
+            continue
+
+        frames = rec.get("frames")
+        if not isinstance(frames, list) or not frames:
+            continue
+
+        for fr in frames:
+            if not isinstance(fr, dict):
                 continue
-            try:
-                rec = json.loads(line)
-            except Exception:
+            file = fr.get("file")
+            if not isinstance(file, str) or not file:
                 continue
 
-            # 只关心 group 记录
-            if not isinstance(rec, dict) or "frames" not in rec:
+            p = Path(file)
+            if p.is_absolute():
+                if p.exists():
+                    return p
                 continue
 
-            frames = rec.get("frames")
-            if not isinstance(frames, list) or not frames:
-                continue
+            # 兼容两种相对路径：
+            # 1) 相对 captures_dir：group_xxx/cam0_xxx.bmp
+            # 2) 相对 repo_root：data/captures_xxx/.../cam0_xxx.bmp
+            candidate = (captures_dir / p).resolve()
+            if candidate.exists():
+                return candidate
 
-            for fr in frames:
-                if not isinstance(fr, dict):
-                    continue
-                file = fr.get("file")
-                if not isinstance(file, str) or not file:
-                    continue
-
-                p = Path(file)
-                if p.is_absolute():
-                    if p.exists():
-                        return p
-                    continue
-
-                # 兼容两种相对路径：
-                # 1) 相对 captures_dir：group_xxx/cam0_xxx.bmp
-                # 2) 相对 repo_root：data/captures_xxx/.../cam0_xxx.bmp
-                candidate = (captures_dir / p).resolve()
-                if candidate.exists():
-                    return candidate
-
-                candidate2 = (repo_root / p).resolve()
-                if candidate2.exists():
-                    return candidate2
+            candidate2 = (repo_root / p).resolve()
+            if candidate2.exists():
+                return candidate2
 
     raise RuntimeError(f"no readable image found in captures: {captures_dir}")
 
@@ -295,12 +288,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-images", type=int, default=0, help="process at most N images when --all (0=all)")
     p.add_argument(
         "--out-jsonl",
-        default=str(repo_root / "data" / "tools_output" / "tennis_test_ultralytics_detections.jsonl"),
+        default=str(repo_root / "data" / "tools_output" / "tennis_ultralytics_detections.jsonl"),
         help="output JSONL path when --all",
     )
     p.add_argument(
         "--out-vis-dir",
-        default=str(repo_root / "data" / "tools_output" / "tennis_test_ultralytics_vis"),
+        default=str(repo_root / "data" / "tools_output" / "tennis_ultralytics_vis"),
         help="output directory for annotated images (when --all or --save-vis)",
     )
     p.add_argument(

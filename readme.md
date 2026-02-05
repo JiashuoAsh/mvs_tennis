@@ -180,7 +180,7 @@ python tools/tennis_localize_from_detections.py --help
   - `sources.py`：两种 source（在线/离线）统一产出 `(meta, images_by_camera)`
   - `core.py`：统一执行 detect → triangulate/localize → 产出 JSON 记录
 - `src/tennis3d/geometry/`：几何与标定 IO（投影矩阵、DLT 三角化、误差等）
-- `src/tennis3d/localization/`：融合逻辑（选每相机最佳 bbox、要求至少 N 视角等）
+- `src/tennis3d/localization/`：融合逻辑（多候选跨视角匹配、重投影误差 gating、去重/冲突消解、要求至少 N 视角等）
 
 ### 参考文件（不会被 pipeline 使用）
 

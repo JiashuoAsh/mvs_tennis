@@ -1,0 +1,121 @@
+﻿# 在线 3D 定位配置（Windows/CPU，两级 ROI）
+#
+# 两级 ROI 的目的：
+# 1) 第一级（相机侧 AOI / Sensor ROI）：优先为带宽服务（减少传输像素数）。
+# 2) 第二级（主机软件裁剪 / detector_crop_*）：优先为推理服务（减少 detector 输入尺寸）。
+#
+# 用法示例：
+# - uv run python -m tennis3d.apps.online --config configs/online/pt_windows_cpu_two_level_roi_4cam.yaml
+# - tennis3d-online --config configs/online/pt_windows_cpu_two_level_roi_4cam.yaml
+
+sdk:
+  # SDK DLL 目录（按你的本机 SDK 安装位置调整；留空表示使用系统 PATH）
+  dll_dir: ""
+
+camera:
+  # 参与采集与定位的相机序列号（必须与标定文件 cameras 的 key 一致）
+  serials:
+    - DA8199303
+    - DA8199402
+    - DA8199243
+    - DA8199285
+
+  # 标定文件（单位：m）
+  calib: data/calibration/camera_extrinsics_C_T_B.json
+
+  # 像素格式：尽量用 8bpp（Bayer/Mono）来降带宽。
+  # 注意：不同机型支持的 PixelFormat 枚举不同；不确定可留空沿用相机当前设置。
+  pixel_format: BayerRG8
+
+  # 曝光/增益：默认保持旧行为（关闭 Auto + 固定参数）。
+  exposure:
+    auto: Off
+    time_us: 10000.0
+  gain:
+    auto: Off
+    value: 12.0
+
+  # ----------------------------
+  # 第一级 ROI：相机侧 ROI（带宽）
+  # ----------------------------
+  # 说明：
+  # - 这里的 ROI 是“裁剪”，不是缩放。
+  # - online 入口会自动把满幅标定转换为 ROI 标定（主点平移），确保像素坐标与标定一致。
+  #
+  # 如果你的相机是“固定 AOI，Width/Height 不可写，但 OffsetX/OffsetY 可写”，
+  # 只要当前输出尺寸就是 1280x1080（或你填的尺寸），这里仍可保留 width/height，
+  # 让标定修正生效。
+  roi:
+    width: 1280
+    height: 1080
+
+    # 初始 offset 推荐先放在中间（按满幅 2448x2048 推算）：
+    # - offset_x=(2448-1280)/2=584
+    # - offset_y=(2048-1080)/2=484
+    # 同时满足常见 Inc=4 的对齐要求。
+    offset_x: 584
+    offset_y: 484
+
+  # 可选（进阶）：相机侧 AOI 运行中平移（动态 OffsetX/OffsetY）。
+  #
+  # 说明：
+  # - 需要机型支持在取流中写 OffsetX/OffsetY；不支持时写入会失败，窗口不会移动。
+  # - 启用后不要对标定做一次性的主点平移；本仓库会自动处理。
+  #
+  # aoi:
+  #   runtime: true
+  #   update_every_groups: 2
+  #   min_move_px: 8
+  #   smooth_alpha: 0.3
+  #   max_step_px: 160
+  #   recenter_after_missed: 30
+
+run:
+  # 在线分组方式：frame_num/trigger_index/sequence
+  group_by: frame_num
+  timeout_ms: 1000
+  group_timeout_ms: 1000
+  max_pending_groups: 256
+  max_groups: 0
+
+detector:
+  # detector：pt 表示用 Ultralytics YOLOv8 .pt 推理
+  # - 如果你在排链路问题，建议先用 fake/color 把几何链路跑稳。
+  name: pt
+  model: data/models/best.pt
+  pt_device: cpu
+
+  # ----------------------------
+  # 第二级 ROI：主机软件裁剪（推理）
+  # ----------------------------
+  # 在 detector 前裁剪较小窗口并在 detector 后做坐标回写（不会影响三角化/几何一致性）。
+  # - 未锁定到第一颗球前：自动不裁剪（全幅推理）
+  # - 丢失一段时间后：自动重置为全幅（避免死锁在错误区域）
+  crop:
+    size: 640
+    # 0~1：越大越跟得紧，但也更抖；0.2 通常是比较稳的起点
+    # smooth_alpha: 0.2
+    # 单步最大移动像素（防抖/限速）
+    # max_step_px: 120
+    # 连续 missed N 次后重置窗口（回到全幅）
+    # reset_after_missed: 8
+
+  min_score: 0.25
+  require_views: 2
+  max_detections_per_camera: 10
+  max_reproj_error_px: 10.0
+  max_uv_match_dist_px: 25.0
+  merge_dist_m: 0.08
+
+trigger:
+  # 触发配置（纯软件触发示例；如需主从触发请参考 configs/online/master_slave_line0.yaml）
+  trigger_source: Software
+  soft_trigger_fps: 30.0
+
+time:
+  # 时间对齐模式：建议在线也开启映射，便于评估组内时间差
+  sync_mode: dev_timestamp_mapping
+
+output:
+  # 输出路径（可选；不写则在线模式默认不落盘）
+  out_jsonl: data/tools_output/online_positions_3d.two_level_roi_4cam.jsonl

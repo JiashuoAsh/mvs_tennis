@@ -45,7 +45,7 @@
 
 - 仅几何三角化（已有 detections.json）：`tools/tennis_localize_from_detections.py`
   - 输入：检测结果 JSON + 标定文件
-  - 输出：`data/tools_output/tennis_positions_3d.json`（可配）
+  - 输出：`data/tools_output/tennis_positions_3d.json`（可配；每个 group 一条记录，包含 `balls: 0..N`）
 
 ## 数据流图
 
@@ -65,7 +65,7 @@ flowchart TD
   H["Detector: fake|color|rknn"] --> G
   I["Calibration: load_calibration"] --> G
 
-  G --> J["offline_positions_3d.jsonl / out_jsonl"]
+  G --> J["offline_positions_3d.jsonl / output.out_jsonl"]
 ```
 
 ## 关键输入/输出格式

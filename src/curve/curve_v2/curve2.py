@@ -63,6 +63,12 @@ class Curve:
     # Z_SPEED_RANGE = [1.5, 27]  # z方向的速度范围
     Z_SPEED_RANGE = [0.5, 27]  # z方向的速度范围
 
+    # 第二段（id==1）Y 拟合策略：
+    # - stage_only：只使用第二段观测点拟合（当前默认）
+    # - joint：旧实现，跨反弹边界联合拟合两段
+    SECOND_STAGE_Y_FIT_STAGE_ONLY = "stage_only"
+    SECOND_STAGE_Y_FIT_JOINT = "joint"
+
     def __init__(self) -> None:
         self.is_debug = False
         self.reset()
@@ -127,6 +133,10 @@ class Curve:
 
         self.is_first_ball_removed = False  # 是否已经移除第一个球
 
+        # 第二段 Y 拟合策略开关：默认只用第二段点拟合。
+        # 如需对比旧算法，可在外部设置：curve.second_stage_y_fit_mode = "joint"。
+        self.second_stage_y_fit_mode = Curve.SECOND_STAGE_Y_FIT_STAGE_ONLY
+
     # 直接取g的加速度，不考虑空气阻力和旋转。返回系数和误差
     # TODO：未来可能需要优化
     def constrained_polyfit(self, x, y, w, fixed_a=-4.9):
@@ -160,6 +170,40 @@ class Curve:
         final_coefficients = np.array([fixed_a, b, c])
 
         return final_coefficients, mse
+
+    def set_second_stage_y_fit_mode(self, mode: str) -> None:
+        """设置第二段（id==1）Y 拟合策略。
+
+        Args:
+            mode: "stage_only" 或 "joint"
+        """
+
+        if mode not in (
+            Curve.SECOND_STAGE_Y_FIT_STAGE_ONLY,
+            Curve.SECOND_STAGE_Y_FIT_JOINT,
+        ):
+            raise ValueError(
+                f"未知的 second_stage_y_fit_mode={mode!r}；"
+                f"只支持 {Curve.SECOND_STAGE_Y_FIT_STAGE_ONLY!r} / {Curve.SECOND_STAGE_Y_FIT_JOINT!r}"
+            )
+        self.second_stage_y_fit_mode = mode
+
+    def fit_second_stage_y_only(self, x, y, w, fixed_a=-4.9):
+        """仅使用第二段观测点拟合 y(t)（忽略第一段与反弹点约束）。
+
+        说明：
+            - 旧实现会跨反弹边界联合拟合两段（依赖第一段下降点 + 第二段上升点），并显式
+              枚举反弹时刻以增强稳定性。
+            - 按当前需求，这里默认使用“只用第二段点”的带重力约束二次拟合：
+              y(t) = a·t² + b·t + c，其中 a 固定为 -4.9。
+            - 该拟合完全不依赖第一段数据，也不强制反弹点连续性；适合做快速校正，但在第二段
+              点数很少或噪声较大时，落点时间可能更不稳定。
+
+        Returns:
+            tuple[np.ndarray, float]: (coeffs, mse)
+        """
+
+        return self.constrained_polyfit(x, y, w, fixed_a=fixed_a)
 
     def fit_piecewise_quadratic(self, x_data, y_data):
         """
@@ -974,7 +1018,7 @@ class Curve:
         拟合策略：
             - X, Z: 线性拟合（考虑空气阻力修正的恒定速度）
             - Y（段0）：约束二次拟合（固定重力加速度 -4.9 m/s²）
-            - Y（段1+）：跨反弹边界的双曲线联合拟合
+            - Y（段1+）：仅使用第二段观测点做约束二次拟合（忽略第一段/反弹点）
             - 融合：反弹早期样本混合预测值和观测值
 
         质量检查：
@@ -1056,21 +1100,29 @@ class Curve:
         elif id == 1:
             test_start_t = time.perf_counter()
 
-            # curve0_y_start_cnt = max(self.ball_start_cnt[0], self.ball_start_cnt[1] - 6)
-            curve0_y_start_cnt = max(
-                self.ball_start_cnt[0], self.ball_start_cnt[1] - 15
-            )
-            curve0_y_end_cnt = self.ball_start_cnt[1]
-            self.y_coeff[id] = self.fit_two_curves(
-                self.ts[curve0_y_start_cnt:curve0_y_end_cnt],
-                self.ys[curve0_y_start_cnt:curve0_y_end_cnt],
-                self.ts[start_cnt:],
-                self.ys[start_cnt:],
-            )["coeffs"]
-            # self.y_coeff[id] = self.fit_quadratic_linear(self.ts[start_cnt:], self.ys[start_cnt:])['coeffs']
-            # self.y_coeff[id] = self.fit_piecewise_quadratic(self.ts[start_y_cnt:], self.ys[start_y_cnt:])
+            if self.second_stage_y_fit_mode == Curve.SECOND_STAGE_Y_FIT_JOINT:
+                # 旧实现：跨反弹边界联合拟合两段。
+                curve0_y_start_cnt = max(
+                    self.ball_start_cnt[0], self.ball_start_cnt[1] - 15
+                )
+                curve0_y_end_cnt = self.ball_start_cnt[1]
+                self.y_coeff[id] = self.fit_two_curves(
+                    self.ts[curve0_y_start_cnt:curve0_y_end_cnt],
+                    self.ys[curve0_y_start_cnt:curve0_y_end_cnt],
+                    self.ts[start_cnt:],
+                    self.ys[start_cnt:],
+                )["coeffs"]
+                # legacy: 旧路径未返回 mse，这里保持历史行为（不更新 y_error_rate）。
+            else:
+                # 默认：仅使用第二段观测点拟合（忽略第一段/反弹点）。
+                self.y_coeff[id], self.y_error_rate[id] = self.fit_second_stage_y_only(
+                    self.ts[start_cnt:],
+                    self.ys[start_cnt:],
+                    self.y_ws[start_cnt:],
+                )
             if self.is_debug:
-                print(f"fit_piecewise_quadratic time: {time.perf_counter() - test_start_t}")
+                mode = self.second_stage_y_fit_mode
+                print(f"second_stage_y_fit({mode}) time: {time.perf_counter() - test_start_t}")
 
         # 如果没有移除第一个点，直接按照猜测进行返回
         # if not self.is_first_ball_removed and is_bot_fire == -1:
@@ -1226,3 +1278,34 @@ class Curve:
         t_at_net = (12 - self.z_coeff[0][1]) / self.z_coeff[0][0]
 
         return np.polyval(self.y_coeff[0], t_at_net)
+
+    def predicted_second_land_time_rel(self):
+        """预测第二段（第一次反弹后）的落地相对时刻。
+
+        说明：
+            - 该接口用于与 curve_v3 对齐：返回“反弹后再次落地”的时刻。
+            - curve_v2 内部已预测多段曲线，并维护 land_point[i]。
+              其中 land_point[1][-1] 即第一次反弹后的下一次落地时刻（相对 time_base）。
+
+        Returns:
+            float | None：可用时返回相对时刻（秒），否则返回 None。
+        """
+
+        lp = self.land_point[1]
+        if lp is None:
+            return None
+        try:
+            return float(lp[-1])
+        except Exception:
+            return None
+
+    def predicted_second_land_time_abs(self):
+        """预测第二段（第一次反弹后）的落地绝对时刻。"""
+
+        t_rel = self.predicted_second_land_time_rel()
+        if t_rel is None:
+            return None
+        try:
+            return float(self.time_base + float(t_rel))
+        except Exception:
+            return None

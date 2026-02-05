@@ -590,15 +590,15 @@ python -m mvs.apps.quad_capture \
 #### 离线：从 captures/metadata.jsonl 输出多球 3D（JSONL）
 
 ```bash
-python -m tennis3d.apps.offline_localize_from_captures --config configs/offline_pt_windows_cpu.yaml
+python -m tennis3d.apps.offline_localize_from_captures --config configs/offline/pt_windows_cpu.yaml
 ```
 
-常用输出文件会写到 `data/tools_output/`（可在 config 中修改 `out_jsonl`）。
+常用输出文件会写到 `data/tools_output/`（可在 config 中修改 `output.out_jsonl`）。
 
 #### 在线：实时取流 → 检测 → 多球定位 → JSONL
 
 ```bash
-python -m tennis3d.apps.online --config configs/online_pt_windows_cpu_software_trigger.yaml
+python -m tennis3d.apps.online --config configs/online/pt_windows_cpu_software_trigger.yaml
 ```
 
 在线模式会通过 `mvs` 打开相机、分组，然后对每个同步组输出一行 JSONL（包含 `balls`）。
@@ -842,7 +842,7 @@ MVS_Deployment/
 │   ├── mvs/                            # 多相机采集与同步组包（ctypes 绑定 MVS SDK）
 │   └── tennis3d/                       # 检测 + 多相机几何 + 多球 3D 定位
 ├── tools/                              # 工具脚本（采集/分析/可视化等）
-├── configs/                            # 在线/离线配置模板（yaml）
+├── configs/                            # 可直接运行的配置（按 online/offline 分类）
 ├── data/
 │   ├── calibration/                    # 示例标定文件
 │   └── captures_master_slave/          # 示例采集数据（如存在）

@@ -6,107 +6,131 @@
 #
 # 用法示例：
 # - uv run python -m tennis3d.apps.online --config examples/configs/templates/online_software_trigger_minimal.yaml
+sdk:
+  # MVS Python 示例绑定目录（MvImport，可选）：
+  mvimport_dir: ""
 
-# MVS Python 示例绑定目录（MvImport，可选）：
-mvimport_dir: ""
+  # MVS SDK 动态库目录（可选）。如果你的环境已配置好 PATH，可留空。
+  dll_dir: ""
 
-# MVS SDK 动态库目录（可选）。如果你的环境已配置好 PATH，可留空。
-dll_dir: ""
+camera:
+  # 相机序列号列表（必填，至少 1 个；多相机建议 2~4 个）
+  serials:
+    - "<CAM1_SERIAL>"
+    - "<CAM2_SERIAL>"
 
-# 相机序列号列表（必填，至少 1 个；多相机建议 2~4 个）
-serials:
-  - "<CAM1_SERIAL>"
-  - "<CAM2_SERIAL>"
+  # 标定文件
+  calib: data/calibration/example_triple_camera_calib.json
 
-# 分组对齐策略：trigger_index|frame_num|sequence
-# 一般在线采集推荐 frame_num。
-group_by: frame_num
+  # 可选：相机图像参数（会传给 SDK）。
+  # - pixel_format 为空表示不设置（沿用相机当前配置）。
+  # - roi.width/roi.height 必须同时设置；不设置就留空或删除。
+  #
+  # 说明：这里的 ROI 是“相机侧裁剪”（改变相机输出宽高/偏移），不是缩放。
+  pixel_format: ""
+  # roi:
+  #   width: 1920
+  #   height: 1080
+  #   offset_x: 0
+  #   offset_y: 0
 
-# 在线时间轴（默认值：frame_host_timestamp）
-# - frame_host_timestamp：沿用原逻辑，用组内 frames[*].host_timestamp 中位数
-# - dev_timestamp_mapping：启用在线滑窗映射（dev_timestamp -> host_ms），更贴近曝光时刻
-time_sync_mode: frame_host_timestamp
+  # 可选：曝光/增益（会在 StartGrabbing 前下发到相机）。
+  # 默认保持旧行为：关闭 Auto，并设置固定曝光/增益。
+  # - 若想完全不干预曝光/增益，可显式设置：
+  #   exposure:
+  #     auto: ""
+  #     time_us: null
+  #   gain:
+  #     auto: ""
+  #     value: null
+  exposure:
+    auto: Off
+    time_us: 10000.0
+  gain:
+    auto: Off
+    value: 12.0
 
-# 以下为在线滑窗映射参数（均为默认值）。仅在 time_sync_mode=dev_timestamp_mapping 时会用到。
-time_mapping_warmup_groups: 20
-time_mapping_window_groups: 200
-time_mapping_update_every_groups: 5
-time_mapping_min_points: 20
-time_mapping_hard_outlier_ms: 50.0
+  # 相机侧 AOI（可选，进阶）：运行中动态平移 OffsetX/OffsetY。
+  #
+  # 典型用法：
+  # 1) 先设置 roi.width/roi.height（固定窗口尺寸）并给一个合理的初始 offset
+  # 2) 再启用 aoi.runtime 让窗口跟随球移动（降带宽）
+  # 3) 如需进一步提速，可叠加 detector.crop.size（在 AOI 内二次软件裁剪）
+  #
+  # 注意：需要机型支持在取流中写 OffsetX/OffsetY；不支持时写入会失败，窗口不会移动。
+  # aoi:
+  #   runtime: true
+  #   update_every_groups: 2
+  #   min_move_px: 8
+  #   smooth_alpha: 0.3
+  #   max_step_px: 160
+  #   recenter_after_missed: 30
 
-# 超时/缓存控制（ms/数量），用于避免一直等不到“齐组”导致的阻塞/内存增长
-timeout_ms: 1000
-group_timeout_ms: 1000
-max_pending_groups: 256
-max_groups: 0
+run:
+  # 分组对齐策略：trigger_index|frame_num|sequence
+  # 一般在线采集推荐 frame_num。
+  group_by: frame_num
 
-# 可选：相机图像参数（会传给 SDK）。
-# - pixel_format 为空表示不设置（沿用相机当前配置）。
-# - image_width/image_height 必须同时设置；不设置就留空或删除。
-#
-# 说明：这里的 ROI 是“相机侧裁剪”（改变相机输出宽高/偏移），不是缩放。
-pixel_format: ""
-# image_width: 1920
-# image_height: 1080
-# image_offset_x: 0
-# image_offset_y: 0
+  # 超时/缓存控制（ms/数量），用于避免一直等不到“齐组”导致的阻塞/内存增长
+  timeout_ms: 1000
+  group_timeout_ms: 1000
+  max_pending_groups: 256
+  max_groups: 0
 
-# 可选：曝光/增益（会在 StartGrabbing 前下发到相机）。
-# 默认保持旧行为：关闭 Auto，并设置固定曝光/增益。
-# - 若想完全不干预曝光/增益，可显式设置：
-#   exposure_auto: ""
-#   exposure_time_us: null
-#   gain_auto: ""
-#   gain: null
-exposure_auto: Off
-exposure_time_us: 10000.0
-gain_auto: Off
-gain: 12.0
+time:
+  # 在线时间轴（默认值：frame_host_timestamp）
+  # - frame_host_timestamp：沿用原逻辑，用组内 frames[*].host_timestamp 中位数
+  # - dev_timestamp_mapping：启用在线滑窗映射（dev_timestamp -> host_ms），更贴近曝光时刻
+  sync_mode: frame_host_timestamp
 
-# 标定文件
-calib: data/calibration/example_triple_camera_calib.json
+  # 以下为在线滑窗映射参数（均为默认值）。仅在 sync_mode=dev_timestamp_mapping 时会用到。
+  mapping_warmup_groups: 20
+  mapping_window_groups: 200
+  mapping_update_every_groups: 5
+  mapping_min_points: 20
+  mapping_hard_outlier_ms: 50.0
 
-# 检测器后端：fake|color|rknn|pt
-# 默认 detector=fake（只用于链路/冒烟）。真实使用通常会改成 pt，并填写 model 路径。
-detector: fake
-model: ""
+detector:
+  # 检测器后端：fake|color|rknn|pt
+  # 默认 name=fake（只用于链路/冒烟）。真实使用通常会改成 pt，并填写 model 路径。
+  name: fake
+  model: ""
 
-# 软件裁剪（动态 ROI，可选）：在 detector 前裁剪小窗口以提高吞吐。
-# - detector_crop_size=0 表示关闭（默认）。
-# - bbox 会自动加回 offset，保证下游仍使用原图像素坐标系。
-# detector_crop_size: 640
-# detector_crop_smooth_alpha: 0.2
-# detector_crop_max_step_px: 120
-# detector_crop_reset_after_missed: 8
+  # detector=pt 时可选：Ultralytics 推理设备（默认 cpu）。
+  pt_device: cpu
 
-# 相机侧 AOI（可选，进阶）：运行中动态平移 OffsetX/OffsetY。
-#
-# 典型用法：
-# 1) 先设置 image_width/image_height（固定窗口尺寸）并给一个合理的初始 offset
-# 2) 再启用 camera_aoi_runtime 让窗口跟随球移动（降带宽）
-# 3) 如需进一步提速，可叠加上面的 detector_crop_size（在 AOI 内二次软件裁剪）
-#
-# 注意：需要机型支持在取流中写 OffsetX/OffsetY；不支持时写入会失败，窗口不会移动。
-# camera_aoi_runtime: true
-# camera_aoi_update_every_groups: 2
-# camera_aoi_min_move_px: 8
-# camera_aoi_smooth_alpha: 0.3
-# camera_aoi_max_step_px: 160
-# camera_aoi_recenter_after_missed: 30
+  # 软件裁剪（动态 ROI，可选）：在 detector 前裁剪小窗口以提高吞吐。
+  # - size=0 表示关闭（默认）。
+  # - bbox 会自动加回 offset，保证下游仍使用原图像素坐标系。
+  # crop:
+  #   size: 640
+  #   smooth_alpha: 0.2
+  #   max_step_px: 120
+  #   reset_after_missed: 8
 
-min_score: 0.25
-require_views: 2
+  min_score: 0.25
+  require_views: 2
 
-# 多球鲁棒定位参数：
-max_detections_per_camera: 10
-max_reproj_error_px: 8.0
-max_uv_match_dist_px: 25.0
-merge_dist_m: 0.08
+  # 多球鲁棒定位参数：
+  max_detections_per_camera: 10
+  max_reproj_error_px: 8.0
+  max_uv_match_dist_px: 25.0
+  merge_dist_m: 0.08
 
-# 输出 JSONL（可选）。默认值：不写文件。
-# - 置空（""）表示 None
-# - 填路径则会持续追加写入
-out_jsonl: ""
+output:
+  # 输出 JSONL（可选）。默认值：不写文件。
+  # - 置空（""）表示 None
+  # - 填路径则会持续追加写入
+  out_jsonl: ""
+
+  # JSONL 写盘策略（性能相关）
+  out_jsonl_only_when_balls: false
+  out_jsonl_flush_every_records: 1
+  out_jsonl_flush_interval_s: 0.0
+
+  # 终端输出策略
+  terminal_print_mode: best
+  terminal_status_interval_s: 0.0
 
 # 触发配置：
 # - trigger_source=Software 且 master_serial 为空：所有相机都设为 Software，并对全部相机下发软触发

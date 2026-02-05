@@ -4,7 +4,7 @@
 - 从 `cap.get_next_group()` 持续读取同步组包。
 - 将每帧转换为 OpenCV BGR 图像。
 - 计算组级别的时间轴信息（capture_t_abs / capture_host_timestamp）。
-- 可选：在线滑窗拟合 dev_timestamp -> host_ms（time_sync_mode=dev_timestamp_mapping）。
+- Optional：在线滑窗拟合 dev_timestamp -> host_ms（time_sync_mode=dev_timestamp_mapping）。
 
 依赖方向：
 - 本模块属于 pipeline 层，可依赖 `mvs.*` 的采集与时间映射实现，但不应依赖 apps/CLI 入口层。
@@ -86,6 +86,10 @@ def iter_mvs_image_groups(
                 raise OnlineGroupWaitTimeout(f"在线采集等待超时：超过 {max_wait:.3f}s 未收到任何完整组包。")
             continue
 
+        # 说明：组包“拿到完整 N 帧”的时刻（主机单调时钟）。
+        # 该时间点可用于估计：主机侧组包/排队开销（配合每帧 arrival_monotonic）。
+        group_ready_monotonic = time.monotonic()
+
         last_progress = time.monotonic()
 
         images_by_camera: dict[str, np.ndarray] = {}
@@ -93,14 +97,37 @@ def iter_mvs_image_groups(
         host_ms_by_camera: dict[str, float] = {}
         serials_in_group: list[str] = []
 
+        # 采集侧诊断字段（主机单调时间 + 原始帧时间戳）。
+        # 注意：这些字段面向“实时性/延迟诊断”，不参与几何计算。
+        arrival_monotonic_by_camera: dict[str, float] = {}
+        dev_ts_by_camera: dict[str, int] = {}
+        host_ts_by_camera: dict[str, int] = {}
+
         for fr in group:
             bgr = frame_to_bgr(binding=binding, cam=cap.cameras[fr.cam_index].cam, frame=fr)
             serial = str(fr.serial)
             images_by_camera[serial] = bgr
             serials_in_group.append(serial)
 
+            # 说明：arrival_monotonic 是 Grabber 在“成功拿到 SDK buffer”后立刻打点。
+            # 它更接近“帧到达主机应用层”的时刻；用于估计传输/缓冲/调度造成的延迟与抖动。
+            try:
+                arrival_monotonic_by_camera[serial] = float(getattr(fr, "arrival_monotonic"))
+            except Exception:
+                pass
+
+            try:
+                dev_ts_by_camera[serial] = int(getattr(fr, "dev_timestamp"))
+            except Exception:
+                pass
+
             try:
                 host_ts_list.append(int(fr.host_timestamp))
+            except Exception:
+                pass
+
+            try:
+                host_ts_by_camera[serial] = int(getattr(fr, "host_timestamp"))
             except Exception:
                 pass
 
@@ -144,7 +171,31 @@ def iter_mvs_image_groups(
             "capture_t_source": str(capture_t_source) if capture_t_source is not None else None,
             "capture_host_timestamp": int(host_ts_med) if host_ts_med is not None else None,
             "time_sync_mode": str(time_sync_mode).strip() or None,
+            # 主机侧诊断：组包完成的单调时间戳（秒）。
+            "capture_group_ready_monotonic": float(group_ready_monotonic),
         }
+
+        if arrival_monotonic_by_camera:
+            meta["capture_arrival_monotonic_by_camera"] = dict(arrival_monotonic_by_camera)
+            try:
+                arr = list(arrival_monotonic_by_camera.values())
+                if arr:
+                    arr_sorted = sorted(arr)
+                    arr_med = float(arr_sorted[len(arr_sorted) // 2])
+                    meta["capture_arrival_monotonic_median"] = float(arr_med)
+                    meta["capture_arrival_monotonic_spread_ms"] = float(1000.0 * (max(arr) - min(arr)))
+                    meta["capture_group_ready_minus_arrival_median_ms"] = float(
+                        1000.0 * (float(group_ready_monotonic) - float(arr_med))
+                    )
+            except Exception:
+                # 防御性：诊断字段计算失败不影响主流程。
+                pass
+
+        if dev_ts_by_camera:
+            meta["capture_frame_dev_timestamp_by_camera"] = {str(k): int(v) for k, v in dev_ts_by_camera.items()}
+
+        if host_ts_by_camera:
+            meta["capture_frame_host_timestamp_by_camera"] = {str(k): int(v) for k, v in host_ts_by_camera.items()}
 
         if host_ms_by_camera:
             meta["time_mapping_host_ms_by_camera"] = dict(host_ms_by_camera)

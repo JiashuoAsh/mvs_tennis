@@ -7,49 +7,57 @@
 # 用法示例：
 # - uv run python -m tennis3d.apps.offline_localize_from_captures --config examples/configs/templates/offline_pt_ultralytics.yaml
 
-# captures 目录：要求包含 metadata.jsonl（由 python -m mvs.apps.quad_capture 生成）
-captures_dir: <PATH_TO_CAPTURES_DIR>
+input:
+  # captures 目录：要求包含 metadata.jsonl（由 python -m mvs.apps.quad_capture 生成）
+  captures_dir: <PATH_TO_CAPTURES_DIR>
 
-# 标定文件：支持 .json/.yaml/.yml（字段见 examples/configs/templates/calibration_multi_camera.yaml）
-calib: <PATH_TO_CALIB_JSON_OR_YAML>
+  # 标定文件：支持 .json/.yaml/.yml（字段见 examples/configs/templates/calibration_multi_camera.yaml）
+  calib: <PATH_TO_CALIB_JSON_OR_YAML>
 
-# 可选：只使用指定相机序列号（serial）参与检测/定位。
-# - 不写：默认使用 captures 中出现的全部相机。
-# - 3D 定位至少需要 2 路视角，且 serials 数量必须 >= require_views。
-# serials:
-#   - DA8199303
-#   - DA8199402
+  # 可选：只使用指定相机序列号（serial）参与检测/定位。
+  # - 不写：默认使用 captures 中出现的全部相机。
+  # - 3D 定位至少需要 2 路视角，且 serials 数量必须 >= detector.require_views。
+  # serials:
+  #   - DA8199303
+  #   - DA8199402
 
-# 检测器后端：fake|color|rknn|pt
-# Windows 上推荐 pt（不依赖 rknn 运行时）。
-detector: pt
+detector:
+  # 检测器后端：fake|color|rknn|pt
+  # Windows 上推荐 pt（不依赖 rknn 运行时）。
+  name: pt
 
-# detector=pt 时必填（.pt）。建议使用相对路径，方便项目搬迁。
-model: <PATH_TO_MODEL_PT>
+  # detector=pt 时必填（.pt）。建议使用相对路径，方便项目搬迁。
+  model: <PATH_TO_MODEL_PT>
 
-min_score: 0.25
-require_views: 2
+  # detector=pt 时可选：推理设备（默认 cpu）。
+  pt_device: cpu
 
-# 多球鲁棒定位参数：
-max_detections_per_camera: 10
-max_reproj_error_px: 8.0
-max_uv_match_dist_px: 25.0
-merge_dist_m: 0.08
+  min_score: 0.25
+  require_views: 2
 
-max_groups: 0
+  # 多球鲁棒定位参数：
+  max_detections_per_camera: 10
+  max_reproj_error_px: 8.0
+  max_uv_match_dist_px: 25.0
+  merge_dist_m: 0.08
 
-# 输出 JSONL 路径（每行一个结果记录）。默认值如下：
-out_jsonl: data/tools_output/offline_positions_3d.jsonl
+run:
+  max_groups: 0
 
-# 时间轴（默认值：frame_host_timestamp）：
-# - frame_host_timestamp：沿用原逻辑，用组内 frames[*].host_timestamp 中位数作为 capture_t_abs
-# - dev_timestamp_mapping：使用预先拟合的 dev_timestamp -> host_ms 映射，把组时间贴近曝光时刻
-time_sync_mode: frame_host_timestamp
+output:
+  # 输出 JSONL 路径（每行一个结果记录）。默认值如下：
+  out_jsonl: data/tools_output/offline_positions_3d.jsonl
 
-# 可选：映射文件路径。
-# - 仅在 time_sync_mode=dev_timestamp_mapping 时生效
-# - 为空表示使用默认路径：<captures_dir>/time_mapping_dev_to_host_ms.json
-time_mapping_path: ""
+time:
+  # 时间轴（默认值：frame_host_timestamp）：
+  # - frame_host_timestamp：沿用原逻辑，用组内 frames[*].host_timestamp 中位数作为 capture_t_abs
+  # - dev_timestamp_mapping：使用预先拟合的 dev_timestamp -> host_ms 映射，把组时间贴近曝光时刻
+  sync_mode: frame_host_timestamp
+
+  # 可选：映射文件路径。
+  # - 仅在 sync_mode=dev_timestamp_mapping 时生效
+  # - 为空表示使用默认路径：<captures_dir>/time_mapping_dev_to_host_ms.json
+  mapping_path: ""
 
 # 可选：轨迹拟合后处理（curve v3）。默认 disabled。
 curve:
