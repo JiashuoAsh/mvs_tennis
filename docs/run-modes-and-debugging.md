@@ -95,7 +95,7 @@ python -m tennis3d.apps.offline_localize_from_captures \
 ### B) 在线（连接相机）
 
 ```bash
-python -m tennis3d.apps.online \
+python -m tennis3d_online \
   --serial <SN0> <SN1> <SN2> <SN3> \
   --calib data/calibration/example_triple_camera_calib.json \
   --detector fake \
@@ -103,7 +103,7 @@ python -m tennis3d.apps.online \
 ```
 
 ```bash
-python -m tennis3d.apps.online \
+python -m tennis3d_online \
   --config configs/online/pt_windows_cpu_software_trigger.yaml
 ```
 
@@ -121,7 +121,7 @@ python -m tennis3d.apps.online \
 本仓库已内置两级 ROI 的配置样例：
 
 ```bash
-python -m tennis3d.apps.online \
+python -m tennis3d_online \
   --config configs/online/pt_windows_cpu_two_level_roi_4cam.yaml
 ```
 

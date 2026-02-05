@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tennis3d-online"
+version = "0.1.0"
+description = "Tennis 3D online app: wiring + runtime + output"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "opencv-python",
+  "pyyaml",
+  "mvs",
+  "tennis3d-core",
+  "tennis3d-detectors",
+]
+
+[project.scripts]
+tennis3d-online = "tennis3d_online.entry:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tennis3d.apps.online.cli import build_arg_parser
-from tennis3d.apps.online.spec import build_spec_from_config
+from tennis3d_online.cli import build_arg_parser
+from tennis3d_online.spec import build_spec_from_config
 from tennis3d.config import load_online_app_config
 
 

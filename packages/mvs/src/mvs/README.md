@@ -15,7 +15,12 @@
 
 项目推荐直接用 `python -m mvs.apps.quad_capture` 做采集，它会把参数、触发映射与诊断数据都记录下来。
 
-入口位置：`src/mvs/apps/quad_capture.py`（在已安装 editable 或设置 `PYTHONPATH=src` 的前提下可用）。
+入口位置：`packages/mvs/src/mvs/apps/quad_capture.py`。
+
+建议的运行方式（避免误用系统 Python）：
+
+- `uv run python -m mvs.apps.quad_capture --help`
+- `uv run python -m mvs.apps.quad_capture --list`
 
 ### 1) 确保能找到 `MvCameraControl.dll`
 
@@ -95,16 +100,12 @@ python -m mvs.apps.quad_capture \
 ```
 mvs/
 ├── __init__.py           # 对外导出 API
-├── binding.py            # ctypes 绑定加载 + DLL 搜索
-├── devices.py            # 设备枚举与描述信息
-├── camera.py             # 相机生命周期 + 参数配置（触发/ROI/像素格式/曝光/增益/IO 输出）
-├── grab.py               # 取流线程（MV_CC_GetImageBuffer）→ FramePacket
-├── grouping.py           # 分组器：把多相机帧组装成“同一次触发的一组”
-├── pipeline.py           # open_quad_capture(): 组装 camera+grabber+queue+assembler
-├── save.py               # SDK 保存 BMP（Bayer 解码可选）
-├── soft_trigger.py       # 软触发循环（用于测试链路 / master 相机）
-├── events.py             # 事件结构，用于记录 ExposureStart 等事件
-└── _cleanup.py           # 清理/容错小工具
+├── analysis/             # 采集输出分析（analyze_capture_run）
+├── apps/                 # CLI 入口（quad_capture / analyze_capture_run 等）
+├── capture/              # 抓流/分组/保存/软触发等采集流水线
+├── core/                 # 纯工具与公共结构（文本/ROI/事件/容错等）
+├── sdk/                  # MVS SDK 绑定加载、设备枚举、相机生命周期、运行时 ROI best-effort
+└── session/              # captures 会话与离线处理（metadata/time_mapping/relayout 等）
 ```
 
 ### 数据流（最重要的 30 秒）

@@ -36,7 +36,7 @@
 ### 3) 为 rknn detector 增加更清晰的依赖与错误提示
 
 - 问题/风险：
-  - `tennis3d.detectors.create_detector(name="rknn")` 会在运行时 import `tennis3d.offline_detect.detector.TennisDetector`。
+  - `tennis3d_detectors.create_detector(name="rknn")` 会在运行时 import `tennis3d.offline_detect.detector.TennisDetector`。
   - 若缺少 RKNN 运行时依赖或平台不支持，错误可能不够聚焦，影响定位。
 - 建议方案：
   - 在 `tennis3d.offline_detect.detector` 内对 RKNN 相关 import 做一次集中检查，并抛出包含“平台限制/安装方式/替代方案(fake/color)”的错误信息。

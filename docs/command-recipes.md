@@ -245,7 +245,7 @@ python -m mvs.apps.quad_capture \
 
 结论先行：
 
-- 在本仓库的实现里，我们明确把 ROI 设置写在 `StartGrabbing` 之前（见 `src/mvs/camera.py`），原因是：
+- 在本仓库的实现里，我们明确把 ROI 设置写在 `StartGrabbing` 之前（见 `mvs.sdk.camera`，文件位置：`packages/mvs/src/mvs/sdk/camera.py`），原因是：
 	**很多机型在开始取流后会把 `Width/Height/OffsetX/OffsetY` 这类节点锁定为不可写**。
 - 但是“很多”不等于“全部”：是否可写依赖你的机型/固件/当前模式（触发/连续采集/像素格式等）。
 
@@ -309,7 +309,7 @@ uv run python tools/mvs_runtime_roi_probe.py \
 在线两级 ROI 示例（相机 AOI=1280×1080，AOI 内再 software crop=640×640）：
 
 ```bash
-uv run python -m tennis3d.apps.online \
+uv run python -m tennis3d_online \
 	--serial DA8199303 DA8199402 DA8199243 DA8199285 \
 	--trigger-source Software --soft-trigger-fps 30 \
 	--pixel-format BayerRG8 \

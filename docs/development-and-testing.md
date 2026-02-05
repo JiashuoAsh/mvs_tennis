@@ -10,12 +10,19 @@
 ```bash
 uv venv
 uv sync
-uv pip install -e .
+```
+
+说明：本仓库采用 uv workspace（单仓多包）。根目录是依赖聚合与测试入口（virtual project），无需（也不应该）再对根目录执行 `pip install -e .`。
+
+开发/测试依赖（例如 pytest）位于依赖组 `dev`，建议额外同步：
+
+```bash
+uv sync --group dev
 ```
 
 ## 构建/安装产物（egg-info）
 
-当你执行 `uv pip install -e .`（或 `pip install -e .`）时，setuptools 可能会在工作区生成 `*.egg-info/` 目录（例如 `mvs_deployment.egg-info/`），用于存放安装元数据（入口点、依赖列表等）。
+当你执行 `pip install -e <某个包目录>`（或某些工具触发 setuptools editable 安装）时，setuptools 可能会在工作区生成 `*.egg-info/` 目录（例如旧结构遗留的 `src/mvs_deployment.egg-info/`），用于存放安装元数据（入口点、依赖列表等）。
 
 - 这类目录属于构建/安装产物，不应作为源码的一部分长期维护。
 - 本仓库的 `.gitignore` 已忽略 `*.egg-info/`，避免将其误提交入库。
@@ -44,15 +51,15 @@ Remove-Item -Recurse -Force mvs_deployment.egg-info, src/mvs_deployment.egg-info
 运行所有测试（推荐）：
 
 ```bash
-pytest -q
+uv run python -m pytest
 ```
 
 你也可以只跑某个测试文件：
 
 ```bash
-pytest -q tests/test_tennis_geometry.py
-pytest -q tests/test_calibration_yaml.py
-pytest -q tests/test_capture_relayout.py
+uv run python -m pytest -q tests/test_tennis_geometry.py
+uv run python -m pytest -q tests/test_calibration_yaml.py
+uv run python -m pytest -q tests/test_capture_relayout.py
 ```
 
 如果你更习惯 `unittest`，也可以运行（但注意它不会执行 pytest 风格用例）：
@@ -98,7 +105,7 @@ TODO（建议落地）：统一使用 `logging`，并支持 `--log-level/--log-f
 
 推荐引入 GitHub Actions（或同类 CI）做纯软件侧的质量门禁：
 
-- 单元测试：`pytest -q`
+- 单元测试：`uv run python -m pytest -q`
 - 代码风格/静态检查：
   - TODO：引入 ruff/pyright，并在 `pyproject.toml` 中配置
 

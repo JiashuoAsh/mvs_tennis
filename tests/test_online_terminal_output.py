@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tennis3d.apps.online.terminal_format import (
+from tennis3d_online.terminal_format import (
     _format_all_balls_lines,
     _format_best_ball_line,
     _format_float3,

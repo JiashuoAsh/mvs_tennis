@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tennis3d-detectors"
+version = "0.1.0"
+description = "Tennis 3D detectors: torch/ultralytics/RKNN adapters"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "opencv-python",
+  "tennis3d-core",
+  "torch>=2.10.0",
+  "torchvision>=0.25.0",
+  "ultralytics>=8.4.6",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]

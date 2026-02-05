@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from tennis3d.config import load_offline_app_config
-from tennis3d.detectors import create_detector
+from tennis3d_detectors import create_detector
 
 
 def test_offline_config_accepts_pt(tmp_path: Path) -> None:

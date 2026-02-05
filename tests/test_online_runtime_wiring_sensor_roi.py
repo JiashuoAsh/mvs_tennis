@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from tennis3d.apps.online.runtime_wiring import SensorRoi, load_calibration_for_runtime
+from tennis3d_online.runtime_wiring import SensorRoi, load_calibration_for_runtime
 
 
 def _write_calib_json(path: Path, *, image_size: tuple[int, int], K: np.ndarray) -> None:

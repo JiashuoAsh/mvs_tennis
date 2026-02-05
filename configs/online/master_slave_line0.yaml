@@ -6,7 +6,7 @@
 # - 如果你要做“采集并保存图片用于标定”（例如 save-mode=sdk-bmp/raw），请使用 mvs.apps.quad_capture。
 #
 # 用法示例：
-# - uv run python -m tennis3d.apps.online --config configs/online/master_slave_line0.yaml
+# - uv run python -m tennis3d_online --config configs/online/master_slave_line0.yaml
 
 sdk:
   # MVS Python 示例绑定目录（MvImport，可选）：

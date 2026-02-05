@@ -4,11 +4,11 @@
 ## 仓库总结（10~20 行）
 
 - 本仓库用于海康工业相机（MVS SDK）多相机同步采集，并在采集图像上完成网球检测与多视角三角化，输出网球 3D 位置。
-- `src/mvs/` 是采集封装：DLL 绑定加载、设备枚举、相机配置、取流线程、按分组键组包、保存 BMP/RAW、事件记录、带宽估算。
+- `packages/mvs/src/mvs/` 是采集封装：DLL 绑定加载、设备枚举、相机配置、取流线程、按分组键组包、保存 BMP/RAW、事件记录、带宽估算。
 - 采集主入口：`python -m mvs.apps.quad_capture`：支持 software/硬触发、master/slave、ROI、像素格式、曝光/增益，并写出 `metadata.jsonl` 供离线复盘。
 - 采集分析入口：`python -m mvs.apps.analyze_capture_run`：用于分析一次采集输出：组包完整性、丢包、FPS、时间差等。
-- `src/tennis3d/` 是业务库：检测器适配（fake/color/rknn）、标定读写、三角化与重投影误差、在线/离线共用 pipeline。
-- 在线入口：`python -m tennis3d.apps.online`（实时取流→检测→三角化→输出 JSONL）。
+- `packages/tennis3d_core/src/tennis3d/` 是业务核心库：标定读写、三角化与重投影误差、在线/离线共用 pipeline core。
+- 在线入口：`python -m tennis3d_online`（实时取流→检测→三角化→输出 JSONL）。
 - 离线入口：`python -m tennis3d.apps.offline_localize_from_captures`（读 captures/metadata.jsonl→检测→三角化→输出 JSONL）。
 - 样例采集数据位于 `data/captures_master_slave/tennis_test/`（包含图片与 `metadata.jsonl`）。
 - 关键依赖：Python >= 3.10、numpy、opencv-python、pyyaml；RKNN 推理依赖运行时环境（通常不在 Windows 上直接可用）。
@@ -17,13 +17,26 @@
 
 ### 1) 安装（推荐 uv）
 
-本仓库采用 src-layout（代码在 `src/` 下），推荐在虚拟环境里使用 editable 安装。
+本仓库已升级为 uv workspace（单仓多包）。源码位于 `packages/*/src/`，根目录仅作为依赖聚合与测试入口（virtual project）。
+
+推荐在仓库根目录使用 uv 一键同步依赖（避免误用系统 Python）：
 
 ```bash
 uv venv
 uv sync
-uv pip install -e .
 ```
+
+开发/测试（安装 dev 依赖组，例如 pytest）：
+
+```bash
+uv sync --group dev
+```
+
+运行命令建议统一使用 `uv run ...`（示例）：
+
+- `uv run python -m tennis3d_online --help`
+- `uv run python -m tennis3d.apps.offline_localize_from_captures --help`
+- `uv run python -m pytest`
 
 ### 2) 设置 MVS DLL（采集相关必需）
 
@@ -66,7 +79,7 @@ python -m mvs.apps.analyze_capture_run --output-dir data/captures_master_slave/t
 - 命令配方（采集/工具链）：`docs/command-recipes.md`
 - 开发与测试：`docs/development-and-testing.md`
 - 改进建议清单：`docs/improvement-suggestions.md`
-- MVS 采集包详细说明：`src/mvs/README.md`
+- MVS 采集包详细说明：`packages/mvs/src/mvs/README.md`
 
 ---
 
@@ -76,17 +89,17 @@ python -m mvs.apps.analyze_capture_run --output-dir data/captures_master_slave/t
 
 ### 在线 3D 定位
 
-- 入口：`src/tennis3d/apps/online/entry.py`（模块包：`src/tennis3d/apps/online/`）
+- 入口：`packages/tennis3d_online/src/tennis3d_online/entry.py`（模块包：`packages/tennis3d_online/src/tennis3d_online/`）
 - 推荐运行方式：
 
 ```bash
-python -m tennis3d.apps.online --help
+python -m tennis3d_online --help
 ```
 
 也支持通过配置文件启动（YAML/JSON）：
 
 ```bash
-python -m tennis3d.apps.online --config path/to/online.yaml
+python -m tennis3d_online --config path/to/online.yaml
 ```
 
 核心参数：
@@ -96,7 +109,7 @@ python -m tennis3d.apps.online --config path/to/online.yaml
   - 纯软件：`--trigger-source Software --soft-trigger-fps <Hz>`
   - 主从：`--master-serial <SERIAL_MASTER> --trigger-source Line0 --soft-trigger-fps <Hz>`
 - `--calib`：标定文件（支持 `.json/.yaml/.yml`）
-- `--detector`：`fake` / `color` / `rknn`
+- `--detector`：`fake` / `color` / `rknn` / `pt`
 - `--require-views`：三角化所需的最少视角数（建议保持 >=2；当 4 台里只有 1 台看到球时，本帧不会输出 3D）
 - `--out-jsonl`：可选，输出 JSONL（不传则在终端输出）
 
@@ -107,7 +120,7 @@ python -m tennis3d.apps.online --config path/to/online.yaml
 
 ### 离线 3D 定位
 
-- 入口：`src/tennis3d/apps/offline_localize_from_captures.py`
+- 入口：`packages/tennis3d_core/src/tennis3d/apps/offline_localize_from_captures.py`
 
 ```bash
 python -m tennis3d.apps.offline_localize_from_captures --help
@@ -143,7 +156,7 @@ python -m tennis3d.apps.offline_localize_from_captures \
 
 ### 生成“假标定”（没有真实标定也能先跑通链路）
 
-- 入口：`src/tennis3d/apps/fake_calibration.py`
+- 入口：`packages/tennis3d_core/src/tennis3d/apps/fake_calibration.py`
 
 ```bash
 python -m tennis3d.apps.fake_calibration --help
@@ -169,18 +182,20 @@ python tools/tennis_localize_from_detections.py --help
 
 旧结构到新结构的对照表见：`docs/layout_migration.md`。
 
-> `mvs` 视为底层 SDK 封装层（src-layout：`src/mvs`），不建议随意重构；业务逻辑集中在 `tennis3d`（`src/tennis3d`）。
+> `mvs` 视为底层 SDK 封装层（见 `packages/mvs/src/mvs`），不建议随意重构；业务核心逻辑集中在 `tennis3d`（见 `packages/tennis3d_core/src/tennis3d`）。
 
-- `src/mvs/`：工业相机采集封装（打开设备、抓流、分组、软触发、保存、像素格式转换等）
-- `src/tennis3d/apps/`：**应用入口层（CLI）**，尽量薄
-	- `online/`：在线取流并定位（`online/app.py` 为主入口）
-  - `offline_localize_from_captures.py`：离线读取 captures 并定位
-  - `detectors.py`：检测器适配（fake/rknn）
-- `src/tennis3d/pipeline/`：**在线/离线共享的流水线**
+
+- `packages/mvs/src/mvs/`：工业相机采集封装（打开设备、抓流、分组、软触发、保存、像素格式转换等）
+- `packages/tennis3d_core/src/tennis3d/`：业务核心库（几何/标定/融合/pipeline，离线 CLI 也在这里）
+- `packages/tennis3d_detectors/src/tennis3d_detectors/`：检测器后端适配（fake/color/pt/rknn），承接重依赖（torch/ultralytics）
+- `packages/tennis3d_online/src/tennis3d_online/`：在线应用层（wiring/输出协议/运行时装配）
+- `packages/curve/src/curve/`：曲线/拟合相关工具（curve_v2/curve_v3）
+
+- `packages/tennis3d_core/src/tennis3d/pipeline/`：**在线/离线共享的流水线**
   - `sources.py`：两种 source（在线/离线）统一产出 `(meta, images_by_camera)`
   - `core.py`：统一执行 detect → triangulate/localize → 产出 JSON 记录
-- `src/tennis3d/geometry/`：几何与标定 IO（投影矩阵、DLT 三角化、误差等）
-- `src/tennis3d/localization/`：融合逻辑（多候选跨视角匹配、重投影误差 gating、去重/冲突消解、要求至少 N 视角等）
+- `packages/tennis3d_core/src/tennis3d/geometry/`：几何与标定 IO（投影矩阵、DLT 三角化、误差等）
+- `packages/tennis3d_core/src/tennis3d/localization/`：融合逻辑（多候选跨视角匹配、重投影误差 gating、去重/冲突消解、要求至少 N 视角等）
 
 ### 参考文件（不会被 pipeline 使用）
 
@@ -196,7 +211,7 @@ python tools/tennis_localize_from_detections.py --help
 
 样例标定（YAML）：`data/calibration/sample_cams.yaml`
 
-格式要点（见 `src/tennis3d/geometry/calibration.py`）：
+格式要点（见 `packages/tennis3d_core/src/tennis3d/geometry/calibration.py`）：
 
 - 顶层必须有 `cameras` 字典
 - 每个相机项必须包含：
@@ -223,7 +238,7 @@ $$P = K [R_{wc}|t_{wc}]$$
 - `--detector fake`：永远在图像中心给一个 bbox（用于没有 RKNN/没有模型时跑通链路）
 - `--detector color`：HSV 颜色阈值找球（适合绿色球/高对比场景，Windows 上可用于先跑通“检测+几何”链路）
 - `--detector pt`：Ultralytics YOLOv8 `.pt`（CPU 推理，适合 Windows 上验证真实模型）
-- `--detector rknn`：RKNN 模型推理（需要 RKNN 运行时支持；由 `src/tennis3d/detectors.py` 统一适配）
+- `--detector rknn`：RKNN 模型推理（需要 RKNN 运行时支持；由 `tennis3d_detectors` 包统一适配）
 
 > Windows 通常无法直接跑 RKNNLite；建议：Windows 上先用 fake 跑通采集/同步/几何链路，然后在支持 RKNN 的环境（通常是 Linux + Rockchip）切换为 rknn。
 
@@ -271,7 +286,7 @@ meta 字段因 source 不同而不同：
 
 ## 在线同步怎么做？（很关键）
 
-在线入口 `tennis3d.apps.online` 通过 `mvs.open_quad_capture` 获取“同步组”（按 `--group-by` 组包）。你需要选择合适的触发拓扑：
+在线入口 `tennis3d_online` 通过 `mvs.open_quad_capture` 获取“同步组”（按 `--group-by` 组包）。你需要选择合适的触发拓扑：
 
 ### A) 纯 Software 触发
 
@@ -330,7 +345,7 @@ python -m mvs.apps.analyze_capture_run --help
 在标定/质检/挑帧等场景中，经常希望把同一台相机的所有帧放在一起。本仓库提供脚本：
 
 - 脚本：`tools/mvs_relayout_by_camera.py`
-- 核心逻辑：`src/mvs/capture_relayout.py`
+- 核心逻辑：`packages/mvs/src/mvs/session/capture_relayout.py`
 
 ### 输入/输出结构
 
@@ -349,11 +364,11 @@ python -m mvs.apps.analyze_capture_run --help
 
 ### 运行方式
 
-推荐在仓库根目录运行（如果你没有做 `pip install -e .`，请确保 `PYTHONPATH=src`）：
+推荐在仓库根目录运行：先 `uv sync`（如需测试则 `uv sync --group dev`），再用 `uv run ...` 执行：
 
 ```bash
 # 例：把 for_calib 输出重排到 for_calib_by_camera
-PYTHONPATH=src python tools/mvs_relayout_by_camera.py \
+uv run python tools/mvs_relayout_by_camera.py \
   --captures-dir data/captures_master_slave/for_calib \
   --output-dir data/captures_master_slave/for_calib_by_camera \
   --mode hardlink

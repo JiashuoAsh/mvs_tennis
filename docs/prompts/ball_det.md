@@ -8,7 +8,7 @@
 - 采集与组包：`python -m mvs.apps.quad_capture` 输出 `<captures_dir>/metadata.jsonl` + 图像文件
 - 离线从 captures 做 3D：入口 offline_localize_from_captures.py
   - 读取组：`tennis3d.pipeline.iter_capture_image_groups()`
-  - 每组图像做检测：`tennis3d.detectors.create_detector()` 得到统一接口 `detect(img_bgr)->list[Detection]`
+  - 每组图像做检测：`tennis3d_detectors.create_detector()` 得到统一接口 `detect(img_bgr)->list[Detection]`
   - 几何定位主流程：`tennis3d.pipeline.run_localization_pipeline()`
   - 核心几何：`tennis3d.localization.localize_ball()`
 

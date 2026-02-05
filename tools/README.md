@@ -26,7 +26,7 @@
 
 同时建议将脚本保持为“可执行脚本”而非“可 import 的库模块”：
 
-- 不要在业务代码里 import `tools/` 下脚本来复用逻辑；如确实需要复用，请将逻辑下沉到 `src/` 中的可复用模块。
+- 不要在业务代码里 import `tools/` 下脚本来复用逻辑；如确实需要复用，请将逻辑下沉到可复用包中（本仓库当前为 uv workspace，多包源码位于 `packages/*/src/`）。
 
 ## 运行方式
 
@@ -34,8 +34,10 @@
 
 - `python tools/<script>.py`
 
-说明：多数工具脚本会 import `src/` 下的包（例如 `mvs`、`tennis3d`）。
-为了避免因未安装项目导致的导入失败，建议先按 `docs/development-and-testing.md`
-完成虚拟环境与“可编辑安装”，再运行工具脚本。
+说明：多数工具脚本会 import workspace 内的包（例如 `mvs`、`tennis3d`、`tennis3d_online`）。
+为了避免误用系统 Python 导致导入失败，建议先按 `docs/development-and-testing.md`
+完成虚拟环境与依赖同步，然后用 `uv run ...` 执行工具脚本，例如：
+
+- `uv run python tools/<script>.py`
 
 若脚本实现了参数解析，通常也支持 `--help` 查看用法。

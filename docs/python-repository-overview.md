@@ -36,7 +36,7 @@
 
 2) 在采集到的多相机图像上完成**网球检测 + 多球鲁棒三角化**，输出网球 3D 世界坐标（在线/离线均支持）：
 
-- 在线：`python -m tennis3d.apps.online`（实时取流 → 检测 → 多球 3D → JSONL）
+- 在线：`python -m tennis3d_online`（实时取流 → 检测 → 多球 3D → JSONL）
 - 离线：`python -m tennis3d.apps.offline_localize_from_captures`（读 captures/metadata.jsonl → 检测 → 多球 3D → JSONL）
 
 ### 核心挑战
@@ -65,7 +65,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                      应用层（CLI）                           │
 │  采集：python -m mvs.apps.quad_capture                         │
-│  在线 3D：python -m tennis3d.apps.online                       │
+│  在线 3D：python -m tennis3d_online                            │
 │  离线 3D：python -m tennis3d.apps.offline_localize_from_captures│
 └────────────────────────┬────────────────────────────────────┘
                          │
@@ -598,7 +598,7 @@ python -m tennis3d.apps.offline_localize_from_captures --config configs/offline/
 #### 在线：实时取流 → 检测 → 多球定位 → JSONL
 
 ```bash
-python -m tennis3d.apps.online --config configs/online/pt_windows_cpu_software_trigger.yaml
+python -m tennis3d_online --config configs/online/pt_windows_cpu_software_trigger.yaml
 ```
 
 在线模式会通过 `mvs` 打开相机、分组，然后对每个同步组输出一行 JSONL（包含 `balls`）。

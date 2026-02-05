@@ -1,7 +1,7 @@
 ## 留档总结：`dev_timestamp` 含义与“曝光开始时间”支持情况（基于当前已查看文件）
 
 ### 1) `dev_timestamp` 在代码库中代表什么
-在已查看的模块 `src/mvs/time_mapping.py` 里，`dev_timestamp` 的定位非常明确：
+在已查看的模块 `packages/mvs/src/mvs/session/time_mapping.py` 里，`dev_timestamp` 的定位非常明确：
 
 - 数据来源：来自 `captures/metadata.jsonl` 的 `frames[*].dev_timestamp` 字段（见模块头注释与 `collect_frame_pairs_from_metadata()` 对 `fr.get("dev_timestamp")` 的读取）。
 - 语义约定：**相机侧计数（ticks）**，单位未知，但在**同一相机/同一会话内单调递增**（见 `LinearTimeMapping` docstring）。
@@ -15,7 +15,7 @@
 ### 2) 我想要“相机曝光开始时间”，仓库里有没有现成实现？
 就目前提供的两个文件来看：
 
-- `src/mvs/time_mapping.py`
+- `packages/mvs/src/mvs/session/time_mapping.py`
   只处理 **帧级 `(dev_timestamp, host_timestamp)` 配对** 的拟合与在线更新；**未看到**对 “ExposureStart/曝光开始事件” 的采集、存储或将事件与帧绑定的逻辑。
 
 - `tools/image_time_sync.py`

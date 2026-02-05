@@ -27,11 +27,11 @@
 
 ### 网球 3D 定位（tennis3d）
 
-- 在线定位：`python -m tennis3d.apps.online`
+- 在线定位：`python -m tennis3d_online`
   - 调用链：
     - `mvs.open_quad_capture()` 打开相机与组包
     - `tennis3d.pipeline.iter_mvs_image_groups()` 把 `FramePacket` 转为 OpenCV BGR 图
-    - `tennis3d.detectors.create_detector()` 选择 fake/color/rknn
+    - `tennis3d_detectors.create_detector()` 选择 fake/color/rknn/pt
     - `tennis3d.pipeline.run_localization_pipeline()`：detect → `tennis3d.localization.localize_balls()` → 输出 JSONL
 
 - 离线定位（从 captures）：`python -m tennis3d.apps.offline_localize_from_captures`

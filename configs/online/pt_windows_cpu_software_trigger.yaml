@@ -1,6 +1,6 @@
 ﻿# 在线采集 + 3D 定位配置（Windows/CPU，使用 Ultralytics YOLOv8 .pt）
 # 用法示例：
-# - uv run python -m tennis3d.apps.online --config configs/online/pt_windows_cpu_software_trigger.yaml
+# - uv run python -m tennis3d_online --config configs/online/pt_windows_cpu_software_trigger.yaml
 # - tennis3d-online --config configs/online/pt_windows_cpu_software_trigger.yaml
 
 sdk:

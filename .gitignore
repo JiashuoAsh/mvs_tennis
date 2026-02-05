@@ -2,6 +2,7 @@
 # Worksapce 忽略规则
 # =========================
 data/
+!data/calibration
 SDK_Development/
 
 # =========================
@@ -72,6 +73,7 @@ htmlcov/
 # ---------- 仓库内临时输出 ----------
 # 说明：这些文件通常来自本地调试/一次性分析脚本，不应进入版本控制。
 output.txt
+temp_delete_me.txt
 temp/**/*.png
 temp/**/*.html
 temp/**/*.json

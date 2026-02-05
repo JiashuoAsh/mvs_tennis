@@ -13,11 +13,12 @@
 
 ## 计划摘要
 
-- 仓库已是标准 src-layout（见 `pyproject.toml`），本轮只做“扫尾治理”：消除根目录孤立模块与临时目录。
-- profile=auto 判定为 `mixed`：既有可复用库（`src/`）又有工具脚本（`tools/`）与示例（`examples/`）。
-- Batch1：把根目录的类型协议模块下沉到 `src/tennis3d/pipeline/types.py`，删除旧路径。
-- Batch2：把 `temp/` 下的离线对比脚本迁移到 `examples/scratch/`；`temp/` 仍保留为临时产物目录，但不再承载代码脚本。
-- Batch3：对 `src/mvs` 做破坏式子包拆分（`core/`、`sdk/`、`capture/`、`session/`），并全库修复 import 路径；公共入口收敛到 `src/mvs/__init__.py`。
+- 仓库已升级为 uv workspace（`packages/` 单仓多包）。每个 member 包采用 src-layout（`packages/<pkg>/src/...`）。
+- profile=auto 判定为 `mixed`：既有可复用库（`packages/*/src`）又有工具脚本（`tools/`）与示例（`examples/`）。
+- Batch1：把根目录的类型协议模块下沉到 `tennis3d.pipeline.types`，删除旧路径（历史记录见下）。
+- Batch2：把 `temp/` 下的离线对比脚本迁移到 `examples/scratch/`（历史记录见下）。
+- Batch3：对 `mvs` 做破坏式子包拆分（`core/`、`sdk/`、`capture/`、`session/`），并全库修复 import 路径（历史记录见下）。
+- Batch4：引入 `packages/` 物理拆包 + uv workspace root（virtual project），并再次全量 `pytest` 验收。
 - 每个 batch 都做：全库清零检查（旧字符串 hits=0）+ import 冒烟 + CLI `--help` + pytest 全量。
 
 ---
@@ -25,14 +26,15 @@
 ## A) 证据摘要（只读）
 
 - 依赖与打包方式：`pyproject.toml`
-	- `package-dir = {"" = "src"}`，表明 Python 包根路径为 `src/`。
-	- `project.scripts` 定义了 `tennis3d-online`/`tennis3d-offline` 等 console scripts。
+	- 根目录为 uv workspace root（`tool.uv.workspace`），自身为 virtual project（`tool.uv.package = false`）。
+	- 各 member 包的 `pyproject.toml` 中使用 `package-dir = {"" = "src"}`，表明每个包的 Python 源码根路径为该 member 的 `src/`。
+	- console scripts 分布在各 member 包中（例如 `tennis3d-online` 位于 `packages/tennis3d_online`）。
 	- `tool.pytest.ini_options.testpaths = ["tests"]`，pytest 收集范围固定为 `tests/`。
 - 运行方式与结构描述：`readme.md`
 	- 明确入口使用 `python -m mvs.apps.*` 与 `python -m tennis3d.apps.*`。
 	- 明确 `tools/mvs_relayout_by_camera.py` 等工具脚本的定位。
 - 测试与工具边界约束：
-	- `docs/development-and-testing.md`：推荐使用 `pytest -q` 跑全量测试。
+	- `docs/development-and-testing.md`：推荐使用 `uv run python -m pytest -q` 跑全量测试。
 	- `tests/test_repo_hygiene_tools_boundary.py`：约束 `tools/` 不能成为可 import 的包目录。
 
 ---
@@ -42,21 +44,23 @@
 候选（最多 2 个）：
 
 1) `pipeline`
-	 - 证据：存在 `src/tennis3d/pipeline/`，且在线/离线共用 pipeline。
+	 - 证据：存在 `packages/tennis3d_core/src/tennis3d/pipeline/`，且在线/离线共用 pipeline。
 2) `mixed`（最终选择）
-	 - 证据：仓库同时包含 SDK 开发资料（`SDK_Development/`）、工具脚本（`tools/`）、示例（`examples/`）、数据（`data/`）、以及多个库包（`src/mvs`、`src/tennis3d`、`src/curve`）。
+	 - 证据：仓库同时包含 SDK 开发资料（`SDK_Development/`）、工具脚本（`tools/`）、示例（`examples/`）、数据（`data/`）、以及多个库包（`packages/mvs`、`packages/tennis3d_core`、`packages/curve` 等）。
 	 - 结构目标更贴合：保持 “库/入口/工具/示例/数据/文档/测试” 清晰边界，而不是强行把所有内容压成单一 pipeline 形态。
 
 ---
 
 ## C) 目标布局（最终目录树）
 
-Python 包根路径：`src/`
+Python 包根路径：`packages/*/src/`
 
 入口位置：
 
 - `src/mvs/apps/`（采集与分析 CLI：`python -m mvs.apps...`）
-- `src/tennis3d/apps/`（在线/离线定位 CLI：`python -m tennis3d.apps...` + `project.scripts`）
+- `packages/mvs/src/mvs/apps/`（采集与分析 CLI：`python -m mvs.apps...`）
+- `packages/tennis3d_core/src/tennis3d/apps/`（离线定位 CLI：`python -m tennis3d.apps...`）
+- `packages/tennis3d_online/src/tennis3d_online/`（在线定位 CLI：`python -m tennis3d_online...` + `tennis3d-online`）
 
 工具/示例边界：
 
@@ -66,6 +70,8 @@ Python 包根路径：`src/`
 本轮不再保留：
 
 - 根目录孤立模块（已下沉到 `src/`）
+
+（历史记录）根目录孤立模块已下沉到可复用包内；当前物理位置为 `packages/tennis3d_core/src/tennis3d/pipeline/types.py`。
 
 本轮约束：
 
@@ -77,18 +83,17 @@ Python 包根路径：`src/`
 .
 ├─ pyproject.toml
 ├─ readme.md
-├─ src/
+├─ packages/
 │  ├─ mvs/
-│  │  ├─ core/
-│  │  ├─ sdk/
-│  │  ├─ capture/
-│  │  └─ session/
-│  ├─ tennis3d/
-│  │  ├─ apps/
-│  │  └─ pipeline/
-│  │     ├─ __init__.py
-│  │     └─ types.py
-│  └─ curve/
+│  │  └─ src/mvs/
+│  ├─ curve/
+│  │  └─ src/curve/
+│  ├─ tennis3d_core/
+│  │  └─ src/tennis3d/
+│  ├─ tennis3d_detectors/
+│  │  └─ src/tennis3d_detectors/
+│  └─ tennis3d_online/
+│     └─ src/tennis3d_online/
 ├─ tools/
 ├─ examples/
 │  └─ scratch/
@@ -116,7 +121,7 @@ Python 包根路径：`src/`
 说明：
 
 - 本批次属于破坏式重构：不再保留 `mvs&#46;binding` / `mvs&#46;camera` 等“扁平模块文件”。
-- 仓库内调用方统一改为：优先从 `mvs` 公共入口（`src/mvs/__init__.py`）导入；仅在需要时才从 `mvs.core` / `mvs.sdk` / `mvs.capture` / `mvs.session` 子包导入。
+- 仓库内调用方统一改为：优先从 `mvs` 公共入口（文件位置：`packages/mvs/src/mvs/__init__.py`）导入；仅在需要时才从 `mvs.core` / `mvs.sdk` / `mvs.capture` / `mvs.session` 子包导入。
 
 | 旧模块（不再存在） | 新模块（内部实现位置） | 推荐用法（仓库内约定） | 备注 |
 |---|---|---|---|
@@ -298,7 +303,7 @@ uv run python -c "import mvs, tennis3d; from tennis3d.pipeline.types import Fuse
 ```bash
 uv run python -m mvs.apps.quad_capture --help
 uv run python -m mvs.apps.analyze_capture_run --help
-uv run python -m tennis3d.apps.online --help
+uv run python -m tennis3d_online --help
 uv run python -m tennis3d.apps.offline_localize_from_captures --help
 uv run python -m tennis3d.apps.offline_detect --help
 uv run python -m tennis3d.apps.fake_calibration --help
@@ -348,7 +353,7 @@ uv run pytest -q
 
 5) CLI `--help`（已执行）
 
-- 命令：`(uv run python -m mvs.apps.quad_capture --help && uv run python -m mvs.apps.analyze_capture_run --help && uv run python -m tennis3d.apps.online --help && uv run python -m tennis3d.apps.offline_localize_from_captures --help && uv run python -m tennis3d.apps.offline_detect --help && uv run python -m tennis3d.apps.fake_calibration --help) > ./output.txt 2>&1`
+- 命令：`(uv run python -m mvs.apps.quad_capture --help && uv run python -m mvs.apps.analyze_capture_run --help && uv run python -m tennis3d_online --help && uv run python -m tennis3d.apps.offline_localize_from_captures --help && uv run python -m tennis3d.apps.offline_detect --help && uv run python -m tennis3d.apps.fake_calibration --help) > ./output.txt 2>&1`
 - 关键输出摘要：`output.txt` 包含各命令的 `usage:`/参数说明，共 425 行；链式执行未中断，说明各入口均能正常打印帮助并退出。
 
 6) pytest 全量（已执行）
@@ -389,7 +394,7 @@ uv run pytest -q
 
 5) CLI `--help`（已执行）
 
-- 命令：`(uv run python -m mvs.apps.quad_capture --help && uv run python -m mvs.apps.analyze_capture_run --help && uv run python -m tennis3d.apps.online --help && uv run python -m tennis3d.apps.offline_localize_from_captures --help && uv run python -m tennis3d.apps.offline_detect --help && uv run python -m tennis3d.apps.fake_calibration --help) > ./output.txt 2>&1`
+- 命令：`(uv run python -m mvs.apps.quad_capture --help && uv run python -m mvs.apps.analyze_capture_run --help && uv run python -m tennis3d_online --help && uv run python -m tennis3d.apps.offline_localize_from_captures --help && uv run python -m tennis3d.apps.offline_detect --help && uv run python -m tennis3d.apps.fake_calibration --help) > ./output.txt 2>&1`
 - 关键输出摘要：`output.txt` 仍为 425 行帮助信息；链式执行未中断。
 
 6) pytest 全量（已执行）
