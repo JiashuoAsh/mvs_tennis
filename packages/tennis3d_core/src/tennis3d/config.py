@@ -425,6 +425,13 @@ class OnlineAppConfig:
     # - >0 表示每隔这么多秒打印一行统计。
     terminal_status_interval_s: float = 0.0
 
+    # Optional：逐组（每个 record / loop）打印耗时分解，用于在线排障与性能观察。
+    # 说明：
+    # - 该输出会比较“吵”，默认关闭。
+    # - 耗时来源主要是 pipeline 内部的 latency_host（align/detect/localize/total），
+    #   以及 output_loop 自己统计的 write/print 耗时。
+    terminal_timing: bool = False
+
     # 在线时间轴：默认仍用 frames[*].host_timestamp 中位数。
     # 若需要更贴近曝光时刻，可启用方案B在线滑窗映射（dev_timestamp -> host_ms）。
     time_sync_mode: _TIME_SYNC_MODE = "frame_host_timestamp"
@@ -578,6 +585,7 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
 
     terminal_print_mode = _as_terminal_print_mode(output.get("terminal_print_mode"), "best")
     terminal_status_interval_s = float(output.get("terminal_status_interval_s", 0.0))
+    terminal_timing = bool(output.get("terminal_timing", False))
 
     out_jsonl_only_when_balls = bool(output.get("out_jsonl_only_when_balls", False))
     out_jsonl_flush_every_records = int(output.get("out_jsonl_flush_every_records", 1))
@@ -692,6 +700,7 @@ def load_online_app_config(path: Path) -> OnlineAppConfig:
         out_jsonl_flush_interval_s=out_jsonl_flush_interval_s,
         terminal_print_mode=terminal_print_mode,
         terminal_status_interval_s=terminal_status_interval_s,
+        terminal_timing=terminal_timing,
         time_sync_mode=time_sync_mode,
         time_mapping_warmup_groups=time_mapping_warmup_groups,
         time_mapping_window_groups=time_mapping_window_groups,

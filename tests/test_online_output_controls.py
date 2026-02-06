@@ -21,6 +21,7 @@ def test_build_arg_parser_accepts_terminal_print_mode_none_and_jsonl_flush_flags
             "none",
             "--terminal-status-interval-s",
             "1.0",
+            "--terminal-timing",
             "--out-jsonl",
             "data/tools_output/x.jsonl",
             "--out-jsonl-only-when-balls",
@@ -34,6 +35,7 @@ def test_build_arg_parser_accepts_terminal_print_mode_none_and_jsonl_flush_flags
     assert str(getattr(args, "pt_device")) == "cuda:0"
     assert str(args.terminal_print_mode) == "none"
     assert float(args.terminal_status_interval_s) == 1.0
+    assert bool(getattr(args, "terminal_timing", False)) is True
     assert str(args.out_jsonl).endswith("x.jsonl")
     assert bool(args.out_jsonl_only_when_balls) is True
     assert int(args.out_jsonl_flush_every_records) == 10
@@ -62,6 +64,7 @@ def test_load_online_app_config_supports_output_controls(tmp_path: Path) -> None
                 "output": {
                     "terminal_print_mode": "none",
                     "terminal_status_interval_s": 1.0,
+                    "terminal_timing": True,
                     "out_jsonl": "data/tools_output/x.jsonl",
                     "out_jsonl_only_when_balls": True,
                     "out_jsonl_flush_every_records": 10,
@@ -82,6 +85,7 @@ def test_load_online_app_config_supports_output_controls(tmp_path: Path) -> None
     assert cfg.pt_device == "cuda:0"
     assert cfg.terminal_print_mode == "none"
     assert cfg.terminal_status_interval_s == 1.0
+    assert bool(getattr(cfg, "terminal_timing", False)) is True
     assert cfg.out_jsonl is not None
     assert Path(cfg.out_jsonl).as_posix().endswith("data/tools_output/x.jsonl")
     assert cfg.out_jsonl_only_when_balls is True
@@ -99,3 +103,4 @@ def test_load_online_app_config_supports_output_controls(tmp_path: Path) -> None
     assert float(spec.exposure_time_us or 0.0) == 8000.0
     assert spec.gain_auto == "Off"
     assert float(spec.gain or 0.0) == 6.0
+    assert bool(getattr(spec, "terminal_timing", False)) is True

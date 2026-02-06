@@ -55,6 +55,7 @@ class OnlineRunSpec:
 
     terminal_print_mode: _TERMINAL_PRINT_MODE
     terminal_status_interval_s: float
+    terminal_timing: bool
 
     trigger_source: str
     master_serial: str
@@ -172,6 +173,7 @@ def build_spec_from_config(cfg: OnlineAppConfig) -> OnlineRunSpec:
             _TERMINAL_PRINT_MODE, str(getattr(cfg, "terminal_print_mode", "best"))
         ),
         terminal_status_interval_s=float(getattr(cfg, "terminal_status_interval_s", 0.0)),
+        terminal_timing=bool(getattr(cfg, "terminal_timing", False)),
         trigger_source=str(cfg.trigger.trigger_source),
         master_serial=str(cfg.trigger.master_serial),
         master_line_out=str(cfg.trigger.master_line_out),
@@ -274,6 +276,7 @@ def build_spec_from_args(args: Any) -> OnlineRunSpec:
             _TERMINAL_PRINT_MODE, str(getattr(args, "terminal_print_mode", "best"))
         ),
         terminal_status_interval_s=float(getattr(args, "terminal_status_interval_s", 0.0)),
+        terminal_timing=bool(getattr(args, "terminal_timing", False)),
         trigger_source=str(getattr(args, "trigger_source")),
         master_serial=str(getattr(args, "master_serial", "") or "").strip(),
         master_line_out=str(getattr(args, "master_line_out")),

@@ -100,8 +100,12 @@ output:
   terminal_status_interval_s: 3.0
   terminal_print_mode: all
 
+  # 可选：逐组（每个 loop / record）打印耗时分解（用于在线排障与性能观察）。
+  # - true 会比较“吵”，建议配合 terminal_print_mode=none 或 best 使用。
+  terminal_timing: true
+
   # JSONL 写盘策略
-  out_jsonl_only_when_balls: true
+  out_jsonl_only_when_balls: false
   out_jsonl_flush_every_records: 20
   out_jsonl_flush_interval_s: 0.5
 

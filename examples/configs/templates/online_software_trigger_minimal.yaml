@@ -132,6 +132,10 @@ output:
   terminal_print_mode: best
   terminal_status_interval_s: 0.0
 
+  # 可选：逐组（每个 loop / record）打印耗时分解。
+  # - true 会比较“吵”，建议配合 terminal_print_mode=none 或 best。
+  terminal_timing: false
+
 # 触发配置：
 # - trigger_source=Software 且 master_serial 为空：所有相机都设为 Software，并对全部相机下发软触发
 trigger:

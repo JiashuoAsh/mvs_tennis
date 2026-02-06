@@ -276,6 +276,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "print a periodic status line every N seconds (0 = disable). Useful when no balls are detected."
         ),
     )
+    p.add_argument(
+        "--terminal-timing",
+        action="store_true",
+        help=(
+            "print per-loop timing breakdown (pipeline + output). Default is off to keep output quiet."
+        ),
+    )
 
     # 在线时间轴（方案B）：实时滑窗映射 dev_timestamp -> host 时间轴。
     p.add_argument(

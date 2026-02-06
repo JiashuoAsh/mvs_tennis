@@ -98,8 +98,21 @@ output:
   # - 置空（""）表示 None
   out_jsonl: ""
 
+  # JSONL 写盘策略（性能相关）
+  out_jsonl_only_when_balls: false
+  out_jsonl_flush_every_records: 1
+  out_jsonl_flush_interval_s: 0.0
+
   # 终端输出模式：best|all|none
   terminal_print_mode: best
+
+  # Optional：周期性输出“状态心跳”，用于无球阶段确认程序仍在跑。
+  # - 0 表示关闭。
+  terminal_status_interval_s: 0.0
+
+  # Optional：逐组（每个 loop / record）打印耗时分解。
+  # - 默认关闭，避免输出过多影响阅读/吞吐。
+  terminal_timing: false
 
 time:
   # 在线时间轴（默认值：frame_host_timestamp）
