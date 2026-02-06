@@ -67,7 +67,7 @@ camera:
   #   recenter_after_missed: 30
 
 run:
-  # 分组对齐策略：trigger_index|frame_num|sequence
+  # 分组对齐策略：frame_num|sequence
   # 一般在线采集推荐 frame_num。
   group_by: frame_num
 

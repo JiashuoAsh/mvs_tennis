@@ -163,7 +163,6 @@ def iter_capture_image_groups(
         meta = {
             "group_seq": rec.get("group_seq"),
             "group_by": rec.get("group_by"),
-            "trigger_index": rec.get("trigger_index"),
             "capture_t_abs": float(capture_t_abs) if capture_t_abs is not None else None,
             "capture_t_source": str(capture_t_source) if capture_t_source is not None else None,
             "capture_host_timestamp": int(host_ts_med) if host_ts_med is not None else None,

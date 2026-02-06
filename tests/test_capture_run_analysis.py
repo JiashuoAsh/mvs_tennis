@@ -26,13 +26,11 @@ def test_analyze_output_dir_minimal_happy_path(tmp_path: Path) -> None:
     group0 = {
         "group_seq": 0,
         "group_by": "frame_num",
-        "trigger_index": 100,
         "created_at": 1_700_000_000.0,
         "frames": [
             {
                 "cam_index": 0,
                 "serial": "SN0",
-                "trigger_index": 100,
                 "frame_num": 10,
                 "dev_timestamp": 1_000,
                 "host_timestamp": 200,
@@ -45,7 +43,6 @@ def test_analyze_output_dir_minimal_happy_path(tmp_path: Path) -> None:
             {
                 "cam_index": 1,
                 "serial": "SN1",
-                "trigger_index": 100,
                 "frame_num": 10,
                 "dev_timestamp": 1_000,
                 "host_timestamp": 201,
@@ -58,7 +55,6 @@ def test_analyze_output_dir_minimal_happy_path(tmp_path: Path) -> None:
             {
                 "cam_index": 2,
                 "serial": "SN2",
-                "trigger_index": 100,
                 "frame_num": 10,
                 "dev_timestamp": 1_000,
                 "host_timestamp": 202,
@@ -74,13 +70,11 @@ def test_analyze_output_dir_minimal_happy_path(tmp_path: Path) -> None:
     group1 = {
         "group_seq": 1,
         "group_by": "frame_num",
-        "trigger_index": 101,
         "created_at": 1_700_000_000.1,
         "frames": [
             {
                 "cam_index": 0,
                 "serial": "SN0",
-                "trigger_index": 101,
                 "frame_num": 11,
                 "dev_timestamp": 2_000,
                 "host_timestamp": 300,
@@ -93,7 +87,6 @@ def test_analyze_output_dir_minimal_happy_path(tmp_path: Path) -> None:
             {
                 "cam_index": 1,
                 "serial": "SN1",
-                "trigger_index": 101,
                 "frame_num": 11,
                 "dev_timestamp": 2_000,
                 "host_timestamp": 301,
@@ -106,7 +99,6 @@ def test_analyze_output_dir_minimal_happy_path(tmp_path: Path) -> None:
             {
                 "cam_index": 2,
                 "serial": "SN2",
-                "trigger_index": 101,
                 "frame_num": 11,
                 "dev_timestamp": 2_000,
                 "host_timestamp": 302,
@@ -127,7 +119,6 @@ def test_analyze_output_dir_minimal_happy_path(tmp_path: Path) -> None:
         expected_cameras=3,
         expected_fps=None,
         fps_tolerance_ratio=0.2,
-        strict_trigger_index=False,
     )
 
     assert summary.records == 2
@@ -140,10 +131,6 @@ def test_analyze_output_dir_minimal_happy_path(tmp_path: Path) -> None:
 
     assert summary.lost_packet_total == 0
     assert summary.groups_with_lost_packet == 0
-
-    # 两组 trigger_index 不相同。
-    assert summary.trigger_index_unique == 2
-    assert summary.trigger_index_all_same is False
 
     # frame_num 归一化 spread 应为 0。
     assert summary.groups_with_frame_num_norm_mismatch == 0

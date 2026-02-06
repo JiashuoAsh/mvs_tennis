@@ -32,7 +32,6 @@ class TestIterCaptureImageGroupsSerialsFilter(unittest.TestCase):
             rec = {
                 "group_seq": 0,
                 "group_by": "frame_num",
-                "trigger_index": 123,
                 "frames": [
                     {"serial": "S1", "file": str(Path("group_0000000000") / "cam0.bmp")},
                     {"serial": "S2", "file": str(Path("group_0000000000") / "cam1.bmp")},
@@ -46,7 +45,6 @@ class TestIterCaptureImageGroupsSerialsFilter(unittest.TestCase):
 
             meta, images_by_camera = groups[0]
             self.assertEqual(meta.get("group_seq"), 0)
-            self.assertEqual(meta.get("trigger_index"), 123)
 
             self.assertIn("S1", images_by_camera)
             self.assertNotIn("S2", images_by_camera)

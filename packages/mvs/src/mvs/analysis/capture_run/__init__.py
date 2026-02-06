@@ -29,7 +29,6 @@ def analyze_output_dir(
     expected_cameras: Optional[int],
     expected_fps: Optional[float],
     fps_tolerance_ratio: float,
-    strict_trigger_index: bool,
 ) -> Tuple[RunSummary, str, Dict[str, Any]]:
     """分析采集输出目录并生成报告。
 
@@ -38,8 +37,6 @@ def analyze_output_dir(
         expected_cameras: 期望相机数量；None 表示从数据自动推断。
         expected_fps: 期望 FPS；None 表示不做 FPS 合格判定。
         fps_tolerance_ratio: FPS 允许相对误差，例如 0.2 表示 ±20%。
-        strict_trigger_index: 是否将 trigger_index 递增作为硬性检查。
-
     Returns:
         (summary, report_text, report_payload)
     """
@@ -49,7 +46,6 @@ def analyze_output_dir(
         expected_cameras=expected_cameras,
         expected_fps=expected_fps,
         fps_tolerance_ratio=float(fps_tolerance_ratio),
-        strict_trigger_index=bool(strict_trigger_index),
     )
 
     report_text = render_report_text(computed)

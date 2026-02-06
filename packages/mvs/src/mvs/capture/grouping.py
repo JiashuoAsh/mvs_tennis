@@ -27,12 +27,11 @@ class TriggerGroupAssembler:
     num_cameras: int
     group_timeout_s: float = 0.2
     max_pending_groups: int = 256
-    group_by: Literal["trigger_index", "frame_num", "sequence"] = "trigger_index"
+    group_by: Literal["frame_num", "sequence"] = "frame_num"
 
     def __post_init__(self) -> None:
         self._pending: Dict[int, Dict[int, FramePacket]] = {}
         self._first_seen: Dict[int, float] = {}
-        self._base_trigger_index_by_cam: Dict[int, int] = {}
         self._base_frame_num_by_cam: Dict[int, int] = {}
         self._seq_by_cam: Dict[int, int] = {}
         self.dropped_groups = 0
@@ -53,23 +52,11 @@ class TriggerGroupAssembler:
     def _group_key(self, pkt: FramePacket) -> int:
         """计算分组键，并在需要时做跨相机序列归一化。
 
-        说明：
-        - 不同相机的 trigger_index 可能不是从同一个起始值开始；但只要它们看到的是同一串触发脉冲，
-          各自的 trigger_index 变化是同速的（每个触发事件 +1）。
-        - 这里用“首次看到的 trigger_index”作为基准，把后续 trigger_index 转成从 0 开始的序列。
-
-        注意：
-        - 该策略要求：采集启动后才开始触发（避免某些相机在启动前漏掉了若干触发脉冲）。
+                说明：
+                - 不同相机的 frame_num 可能不是从同一个起始值开始；但只要各相机都在同一触发节奏下工作，
+                    frame_num 的变化通常同速。
+                - 这里用“首次看到的 frame_num”作为基准，把后续 frame_num 转成从 0 开始的序列。
         """
-
-        if self.group_by == "trigger_index":
-            base = self._base_trigger_index_by_cam.get(pkt.cam_index)
-            if base is None:
-                self._base_trigger_index_by_cam[pkt.cam_index] = int(pkt.trigger_index)
-                base = int(pkt.trigger_index)
-
-            # trigger_index 在 SDK 侧是无符号整型语义，这里按 32-bit wrap 处理更稳。
-            return (int(pkt.trigger_index) - int(base)) & 0xFFFFFFFF
 
         if self.group_by == "frame_num":
             base = self._base_frame_num_by_cam.get(pkt.cam_index)
@@ -82,7 +69,7 @@ class TriggerGroupAssembler:
 
         if self.group_by == "sequence":
             # 以“每台相机进入分组器的帧顺序”作为分组键。
-            # 适用于：没有 trigger_index、但所有相机由同一触发脉冲驱动且不丢帧的场景。
+            # 适用于：所有相机由同一触发脉冲驱动且基本不丢帧的场景。
             seq = int(self._seq_by_cam.get(pkt.cam_index, 0))
             self._seq_by_cam[pkt.cam_index] = seq + 1
             return seq
@@ -96,7 +83,7 @@ class TriggerGroupAssembler:
             pkt: 任意相机的一帧。
 
         Returns:
-            当某个 trigger_index 的分组已凑齐 `num_cameras` 帧时，按 cam_index 顺序返回列表；
+            当某个分组键的分组已凑齐 `num_cameras` 帧时，按 cam_index 顺序返回列表；
             否则返回 None。
         """
 

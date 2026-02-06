@@ -83,7 +83,6 @@ flowchart TD
 {
   "group_seq": 0,
   "group_by": "frame_num",
-  "trigger_index": 0,
   "frames": [
     {
       "cam_index": 0,
@@ -99,7 +98,7 @@ flowchart TD
 
 注意：
 - `file` 可能是相对路径；离线读取会用 `captures_dir` 进行补全。
-- 分组键 `group_by` 推荐以采集时选择为准：`trigger_index|frame_num|sequence`。
+- 分组键 `group_by` 推荐以采集时选择为准：`frame_num|sequence`。
 
 ### 2) 标定文件（JSON/YAML）
 

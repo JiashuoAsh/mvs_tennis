@@ -130,7 +130,6 @@ def ensure_sample_sequence(
                 {
                     "cam_index": int(cam_index),
                     "serial": str(cam.name),
-                    "trigger_index": int(gi),
                     "frame_num": int(gi + 1),
                     # 说明：dev_timestamp/host_timestamp 只是为了让离线 pipeline 能计算 capture_t_abs。
                     "dev_timestamp": int(base_dev + gi * 10_000 + cam_index * 100),
@@ -146,7 +145,6 @@ def ensure_sample_sequence(
             {
                 "group_seq": int(gi),
                 "group_by": "sequence",
-                "trigger_index": int(gi),
                 "created_at": float(time.time()),
                 "frames": frames,
             }

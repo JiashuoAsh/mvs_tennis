@@ -50,7 +50,7 @@ camera:
   #   recenter_after_missed: 30
 
 run:
-  # 分组对齐策略：trigger_index|frame_num|sequence
+  # 分组对齐策略：frame_num|sequence
   group_by: frame_num
 
   # 超时/缓存控制（ms/数量），用于避免一直等不到“齐组”导致的阻塞/内存增长

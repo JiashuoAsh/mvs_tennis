@@ -58,8 +58,15 @@ def example_quad_capture_one_group():
     ]
     trigger_source = "Software"  # 用软触发（先测试链路）
     soft_trigger_fps = 5.0  # 5fps 触发
-    group_by = "frame_num"  # 若你发现 nTriggerIndex 恒为 0，可改为 "frame_num" 或 "sequence"
+    group_by = "frame_num"  # 组包键：frame_num 或 sequence
     # === 配置结束 ===
+
+    def _group_key(group_by: str, group) -> int | None:
+        if not group:
+            return None
+        if str(group_by).strip() == "sequence":
+            return int(getattr(group[0], "sequence", -1))
+        return int(getattr(group[0], "frame_num", -1))
 
     try:
         binding = load_mvs_binding()
@@ -88,7 +95,8 @@ def example_quad_capture_one_group():
                 print("Timeout: no group received")
                 return
 
-            print(f"Got group with trigger_index={group[0].trigger_index}:")
+            key = _group_key(group_by, group)
+            print(f"Got group: group_by={group_by} key={key}")
             for frame in group:
                 print(
                     f"  cam{frame.cam_index}: {frame.width}x{frame.height}, "
@@ -132,7 +140,7 @@ def example_batch_capture():
             timeout_ms=1000,
             group_timeout_ms=500,
             max_pending_groups=256,
-            group_by="trigger_index",  # 若 nTriggerIndex 恒为 0，可切到 "frame_num"/"sequence"
+            group_by="frame_num",
             enable_soft_trigger_fps=5.0,
             soft_trigger_serials=serials,
         ) as cap:
@@ -142,9 +150,8 @@ def example_batch_capture():
                     print(f"Group {i}: timeout")
                     continue
 
-                trigger_idx = group[0].trigger_index
-                # 目录命名优先用循环序号，避免 trigger_idx 恒为 0 时全部写到同一目录。
-                group_dir = output_dir / f"group_{i:010d}_trig_{trigger_idx:010d}"
+                group_key = int(getattr(group[0], "frame_num", -1)) if group else -1
+                group_dir = output_dir / f"group_{i:010d}_key_{group_key:010d}"
                 group_dir.mkdir(parents=True, exist_ok=True)
 
                 for frame in group:
@@ -154,7 +161,7 @@ def example_batch_capture():
 
                 # 打印统计信息
                 dropped = cap.assembler.dropped_groups
-                print(f"Group {i}: trigger_idx={trigger_idx}, assembler_dropped={dropped}")
+                print(f"Group {i}: key={group_key}, assembler_dropped={dropped}")
     except Exception as e:
         print(f"Error: {e}")
         import traceback

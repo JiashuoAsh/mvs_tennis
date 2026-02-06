@@ -71,7 +71,7 @@ camera:
   #   recenter_after_missed: 30
 
 run:
-  # 在线分组方式：frame_num/trigger_index/sequence
+  # 在线分组方式：frame_num/sequence
   group_by: frame_num
   timeout_ms: 1000
   group_timeout_ms: 1000

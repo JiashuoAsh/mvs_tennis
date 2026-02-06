@@ -131,24 +131,20 @@ MVS SDK -> Grabber(每台相机一个线程) -> frame_queue -> QuadCapture.get_n
 
 ### 2) `--group-by` 的选择（强烈建议读懂）
 
-采集入口（`mvs.apps.quad_capture`）支持三种分组键：
+采集入口（`mvs.apps.quad_capture`）当前支持两种分组键：
 
-1. `trigger_index`：使用 SDK 帧信息 `MV_FRAME_OUT_INFO_EX.nTriggerIndex`
-   - **优点**：如果你的机型/固件能正常递增，这是最强“同一次触发”证据
-   - **坑点**：部分机型/固件/配置下它可能恒为 0 或不递增（你就遇到了）
+1. `frame_num`（脚本默认）：使用 `nFrameNum`，并对每台相机做“基准归一化”
+  - **优点**：兼容性最好；在触发频率一致且不丢帧时很好用
+  - **坑点**：一旦某台相机丢帧/断流，帧号会错位，组包会超时并产生 `dropped_groups`
 
-2. `frame_num`（脚本默认）：使用 `nFrameNum`，并对每台相机做“基准归一化”
-   - **优点**：很多机型都可靠递增；在触发频率一致且不丢帧时很好用
-   - **坑点**：一旦某台相机丢帧/断流，帧号会错位，组包会超时并产生 `dropped_groups`
+2. `sequence`：按“进入分组器的顺序编号”
+  - **用途**：极简兜底；要求更严格（不能丢帧、不能乱序）
 
-3. `sequence`：按“进入分组器的顺序编号”
-   - **用途**：极简兜底；要求更严格（不能丢帧、不能乱序）
-
-> 结论：如果你发现 `trigger_index` 全是 0，不是你写错命令——请直接用默认的 `frame_num` 分组，并用 `lost_packet/dropped_groups` 做质量判定。
+说明：历史上曾尝试过使用设备端某些触发相关字段作为分组键，但在部分机型/固件/配置下可能恒为常数或不递增，容易制造误判，因此已从本仓库移除。
 
 ### 3) “基准归一化”为什么重要
 
-同一个字段（`trigger_index` 或 `frame_num`）在不同相机上可能不是从同一个起点开始。
+同一个字段（例如 `frame_num`）在不同相机上可能不是从同一个起点开始。
 分组器会记录每台相机首次看到的值作为 base，然后用：
 
 $$group\_key = (value - base) \& 0xFFFFFFFF$$
@@ -176,7 +172,7 @@ $$group\_key = (value - base) \& 0xFFFFFFFF$$
 1) **事件记录**（例如 `ExposureStart`）：`type=camera_event`
 
 2) **组记录**：包含 `group_seq/group_by/frames[]`，每个 `frames[]` 中有：
-- `trigger_index` / `frame_num`
+- `frame_num`
 - `dev_timestamp`（设备时间戳）
 - `host_timestamp` / `arrival_monotonic`（诊断用）
 - `lost_packet`
@@ -186,17 +182,17 @@ $$group\_key = (value - base) \& 0xFFFFFFFF$$
 
 ## 排坑清单（你大概率会踩的那种）
 
-### 1) `trigger_index` 全是 0（最常见）
+### 1) `frame_num` 错位 / 组包超时（最常见）
 
-**原因**：SDK 的 `nTriggerIndex` 在部分机型/固件/触发配置下不会递增（甚至恒为 0）。
+**原因**：某台相机丢帧/断流/触发不一致，导致 `frame_num` 进度不一致。
 
-**怎么确认它是不是“不可用”**：
-- 采 20~50 组，在 `metadata.jsonl` 里看 `frames[].trigger_index` 是否只有 0
+**怎么确认**：
+- 优先看 `lost_packet` 是否为 0
+- 看 `dropped_groups` 是否持续增长
 
 **建议做法**：
-- 不要强行用 `--group-by trigger_index`
-- 使用默认 `--group-by frame_num`
-- 用 `lost_packet==0` + `dropped_groups==0` 证明“没有丢帧导致错位”
+- 先用默认 `--group-by frame_num`
+- 在你确认“不丢帧且节拍稳定”时，再尝试 `--group-by sequence`
 
 ### 2) 你以为是 master/slave，实际全软件触发
 
@@ -251,7 +247,7 @@ with open_quad_capture(
     timeout_ms=1000,
     group_timeout_ms=1000,
     max_pending_groups=256,
-    group_by="frame_num",  # 如果你确认 nTriggerIndex 递增，再改为 trigger_index
+    group_by="frame_num",
     enable_soft_trigger_fps=0.0,
     exposure_auto="Off",
     exposure_time_us=5000.0,
@@ -260,7 +256,7 @@ with open_quad_capture(
 ) as cap:
     group = cap.get_next_group(timeout_s=1.0)
     if group:
-        print([f"cam{f.cam_index}: frame_num={f.frame_num} trigger_index={f.trigger_index}" for f in group])
+        print([f"cam{f.cam_index}: frame_num={f.frame_num}" for f in group])
 ```
 
 ---

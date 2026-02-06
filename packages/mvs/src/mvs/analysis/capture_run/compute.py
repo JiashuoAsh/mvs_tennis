@@ -34,7 +34,6 @@ def compute_run_analysis(
     expected_cameras: Optional[int],
     expected_fps: Optional[float],
     fps_tolerance_ratio: float,
-    strict_trigger_index: bool,
 ) -> Tuple[RunComputed, Dict[str, Any]]:
     """计算采集输出目录的统计结果。
 
@@ -77,7 +76,6 @@ def compute_run_analysis(
     groups_incomplete = 0
     missing_files = 0
 
-    trigger_indices: List[int] = []
     host_spreads_ms: List[int] = []
     dev_spreads_raw: List[int] = []
     dev_spreads_norm: List[int] = []
@@ -108,12 +106,6 @@ def compute_run_analysis(
     base_dev_by_cam: Dict[int, int] = {}
 
     try:
-        trigger_dirs = sum(
-            1 for p in output_dir.iterdir() if p.is_dir() and p.name.startswith("trigger_")
-        )
-    except Exception:
-        trigger_dirs = 0
-    try:
         group_dirs = sum(1 for p in output_dir.iterdir() if p.is_dir() and p.name.startswith("group_"))
     except Exception:
         group_dirs = 0
@@ -125,17 +117,6 @@ def compute_run_analysis(
     for r in group_records:
         frs = r.get("frames", []) or []
         frames_per_group.append(len(frs))
-
-        # trigger_index
-        try:
-            trig = r.get("trigger_index")
-            if trig is not None:
-                trigger_indices.append(int(trig))
-        except Exception:
-            try:
-                trigger_indices.append(int(frs[0].get("trigger_index")))  # type: ignore[union-attr]
-            except Exception:
-                pass
 
         cam_set = set()
         dev_ts_raw: List[int] = []
@@ -250,11 +231,6 @@ def compute_run_analysis(
 
     frames_per_group_sorted = sorted(frames_per_group)
 
-    trig_unique = len(set(trigger_indices)) if trigger_indices else 0
-    trig_all_same = (trig_unique == 1) if trigger_indices else False
-    trig_min = min(trigger_indices) if trigger_indices else 0
-    trig_max = max(trigger_indices) if trigger_indices else 0
-
     created_ts: List[float] = []
     for r in group_records:
         try:
@@ -326,11 +302,6 @@ def compute_run_analysis(
         frames_per_group_min=min(frames_per_group_sorted),
         frames_per_group_median=float(statistics.median(frames_per_group_sorted)),
         frames_per_group_max=max(frames_per_group_sorted),
-        trigger_index_unique=trig_unique,
-        trigger_index_all_same=trig_all_same,
-        trigger_index_min=trig_min,
-        trigger_index_max=trig_max,
-        trigger_dirs=int(trigger_dirs),
         group_dirs=int(group_dirs),
         width_unique=len(widths) if widths else 0,
         height_unique=len(heights) if heights else 0,
@@ -408,16 +379,6 @@ def compute_run_analysis(
         )
     )
 
-    if strict_trigger_index:
-        checks.append(
-            (
-                "TriggerIndex 递增（用于严格证明同一次触发）",
-                (not summary.trigger_index_all_same)
-                and (summary.trigger_index_unique >= max(2, summary.records // 2)),
-                "trigger_index 若正常递增，才能可靠用它做分组键；若恒为 0，会让“严格同步”缺少证据。",
-            )
-        )
-
     if expected_fps is not None:
         fps_for_check = (
             summary.arrival_fps_median if summary.arrival_fps_median is not None else summary.approx_fps_median
@@ -452,7 +413,6 @@ def compute_run_analysis(
         group_by_values=group_by_values,
         expected_fps=expected_fps,
         fps_tolerance_ratio=float(fps_tolerance_ratio),
-        strict_trigger_index=bool(strict_trigger_index),
         summary=summary,
         checks=checks,
         frame_num_continuity_lines=cont_lines,

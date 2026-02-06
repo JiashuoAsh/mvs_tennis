@@ -206,14 +206,10 @@ def run_capture_session(*, binding, config: CaptureSessionConfig) -> CaptureSess
 
                 # 走到这里说明拿到了一组完整的同步帧。
                 group_seq = groups_done
-                trigger_index = group[0].trigger_index
                 files: list[str | None] = [None] * len(group)
 
                 if config.save_mode != "none":
-                    if config.group_by == "trigger_index":
-                        group_dir = out_dir / f"trigger_{trigger_index:010d}"
-                    else:
-                        group_dir = out_dir / f"group_{group_seq:010d}"
+                    group_dir = out_dir / f"group_{group_seq:010d}"
                     _ensure_dir(group_dir)
 
                     for fr in group:
@@ -243,13 +239,11 @@ def run_capture_session(*, binding, config: CaptureSessionConfig) -> CaptureSess
                 record = {
                     "group_seq": group_seq,
                     "group_by": config.group_by,
-                    "trigger_index": trigger_index,
                     "created_at": time.time(),
                     "frames": [
                         {
                             "cam_index": fr.cam_index,
                             "serial": fr.serial,
-                            "trigger_index": fr.trigger_index,
                             "frame_num": fr.frame_num,
                             "dev_timestamp": fr.dev_timestamp,
                             "host_timestamp": fr.host_timestamp,

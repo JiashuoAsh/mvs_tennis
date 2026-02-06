@@ -46,11 +46,6 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="FPS 允许相对误差（默认 0.2=±20%%）",
     )
     p.add_argument(
-        "--strict-trigger-index",
-        action="store_true",
-        help="将 trigger_index 递增作为硬性检查（严格同步场景推荐开启）",
-    )
-    p.add_argument(
         "--write-json",
         default="analysis_summary.json",
         help="将汇总写入 JSON 文件（例如 analysis_summary.json；为空则不写）",
@@ -79,7 +74,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             expected_cameras=args.expected_cameras,
             expected_fps=args.expected_fps,
             fps_tolerance_ratio=float(args.fps_tolerance),
-            strict_trigger_index=bool(args.strict_trigger_index),
         )
     except Exception as exc:
         print(f"analyze failed: {exc}")

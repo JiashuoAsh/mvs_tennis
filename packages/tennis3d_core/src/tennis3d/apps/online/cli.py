@@ -94,7 +94,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--group-by",
-        choices=["trigger_index", "frame_num", "sequence"],
+        choices=["frame_num", "sequence"],
         default="frame_num",
         help="grouping key",
     )

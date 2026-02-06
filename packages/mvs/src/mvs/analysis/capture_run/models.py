@@ -31,14 +31,7 @@ class RunSummary:
     frames_per_group_median: float
     frames_per_group_max: int
 
-    # trigger_index
-    trigger_index_unique: int
-    trigger_index_all_same: bool
-    trigger_index_min: int
-    trigger_index_max: int
-
     # 输出目录结构
-    trigger_dirs: int
     group_dirs: int
 
     # 图像格式一致性
@@ -110,7 +103,6 @@ class RunComputed:
 
     expected_fps: Optional[float]
     fps_tolerance_ratio: float
-    strict_trigger_index: bool
 
     summary: RunSummary
     checks: List[Tuple[str, bool, str]]

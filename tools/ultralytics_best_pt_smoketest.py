@@ -396,7 +396,6 @@ def main(argv: list[str] | None = None) -> int:
                         "cam_index": int(fr.get("cam_index", -1)),
                         "frame_num": int(fr.get("frame_num", -1)),
                         "serial": str(fr.get("serial", "")),
-                        "trigger_index": int(fr.get("trigger_index", -1)),
                         "host_timestamp": int(fr.get("host_timestamp", -1)),
                         "image": str(img_path),
                         "vis": vis_path,

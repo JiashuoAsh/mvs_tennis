@@ -152,7 +152,7 @@ def _as_optional_float(x: Any) -> float | None:
 
 
 _DETECTOR = Literal["fake", "color", "rknn", "pt"]
-_GROUP_BY = Literal["trigger_index", "frame_num", "sequence"]
+_GROUP_BY = Literal["frame_num", "sequence"]
 _TIME_SYNC_MODE = Literal["frame_host_timestamp", "dev_timestamp_mapping"]
 _TERMINAL_PRINT_MODE = Literal["best", "all", "none"]
 
@@ -166,8 +166,8 @@ def _as_detector(x: Any, default: str) -> _DETECTOR:
 
 def _as_group_by(x: Any, default: str) -> _GROUP_BY:
     s = str(x if x is not None else default).strip()
-    if s not in {"trigger_index", "frame_num", "sequence"}:
-        raise RuntimeError(f"unknown group_by: {s} (expected: trigger_index|frame_num|sequence)")
+    if s not in {"frame_num", "sequence"}:
+        raise RuntimeError(f"unknown group_by: {s} (expected: frame_num|sequence)")
     return cast(_GROUP_BY, s)
 
 

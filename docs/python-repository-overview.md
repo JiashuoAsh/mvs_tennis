@@ -44,7 +44,7 @@
 | 挑战 | 解决方案 |
 |------|--------|
 | **带宽限制** | 4×2448×2048@30fps 在 1GbE 下不可行 → 建议降帧率/ROI/多网卡 |
-| **时间同步** | 不用主机到达时间，而是用相机的 `nTriggerIndex` 字段分组 |
+| **帧对齐/组包** | 不用主机到达时间做“同步判断”；而是基于硬件触发链路保证同步曝光，并在软件侧按 `--group-by`（默认 `frame_num`，必要时 `sequence`）把多相机帧配对成同一个 group |
 | **触发同步** | 优先硬件外触发（保证同一曝光时刻），次选 PTP + Scheduled Action |
 | **SDK 可用性** | 工作区内缺失 dll → 延迟加载绑定，清晰报错与重定向输出 |
 
@@ -224,13 +224,13 @@ finally:
 **职责**：启动后台线程拉取图像，放入队列供上层处理。
 
 **关键类**：
-- `FramePacket`：单帧信息（cam_index, serial, trigger_index, dev_timestamp, host_timestamp, width, height, pixel_type, frame_len, lost_packet, arrival_monotonic, data）
+- `FramePacket`：单帧信息（cam_index, serial, frame_num, dev_timestamp, host_timestamp, width, height, pixel_type, frame_len, lost_packet, arrival_monotonic, data）
 - `Grabber`：单相机取流线程
 
 **关键方法**：
 - `Grabber.run()`（后台线程）
   - 循环调用 `MV_CC_GetImageBuffer(st_frame, timeout_ms)`
-  - 提取帧元数据（宽、高、像素类型、时间戳、trigger_index）
+  - 提取帧元数据（宽、高、像素类型、时间戳等）
   - 复制数据到 Python bytes
   - 调用 `MV_CC_FreeImageBuffer` 回收 SDK 缓存
   - 将 FramePacket 放入队列（超时/满时丢弃，不中断取流）
@@ -241,9 +241,9 @@ finally:
 
 ---
 
-### 5. grouping.py - trigger_index 分组
+### 5. grouping.py - frame_num/sequence 分组
 
-**职责**：接收单个 FramePacket，按 trigger_index 聚合成 4 张一组。
+**职责**：接收单个 FramePacket，按 `group_by`（frame_num/sequence）聚合成 4 张一组。
 
 **关键类**：
 - `TriggerGroupAssembler`
@@ -402,7 +402,7 @@ with open_quad_capture(...) as cap:
             print("timeout")
             continue
 
-        # group 是 List[FramePacket]，长度为 4，都有相同的 trigger_index
+        # group 是 List[FramePacket]，长度为 4，表示一次“同步配对”后的结果
         for frame in group:
             print(f"cam{frame.cam_index}: {frame.width}x{frame.height}")
             # 处理图像数据（frame.data 是 bytes）
@@ -422,7 +422,7 @@ frame_queue (Queue[FramePacket])
   │ 消费者：应用层 get_next_group()
   ▼
 TriggerGroupAssembler
-  │ 按 trigger_index 分组
+  │ 按 group_by 分组（frame_num/sequence）
   ▼
 应用层
   │ 处理 4 张同步图
@@ -436,7 +436,6 @@ TriggerGroupAssembler
 |----------|------|------|
 | `dev_timestamp` | 微秒级（设备端） | **主要用途**：帧对齐、触发时刻判断 |
 | `host_timestamp` | 毫秒级（主机端） | 诊断用：检测网络/程序延迟 |
-| `trigger_index` | 无单位（计数） | **分组键**：确保 4 张图来自同一触发 |
 | `arrival_monotonic` | 秒（主机单调时钟） | 性能统计 |
 
 **最佳实践**：
@@ -444,9 +443,6 @@ TriggerGroupAssembler
 for frame in group:
     # 用 dev_timestamp 做精确对齐
     precise_time = frame.dev_timestamp  # 微秒
-
-    # 用 trigger_index 确认是同一次触发
-    assert frame.trigger_index == group[0].trigger_index
 
     # host_timestamp 仅用于调试
     host_delay = frame.host_timestamp - frame.dev_timestamp
@@ -469,7 +465,7 @@ for frame in group:
 - `created_at`: `float`，Unix epoch 秒（用于落盘时间，不等价于相机曝光时间）
 - `meta...`: 来自 source 的可序列化元信息
   - 在线常见：`group_index`
-  - 离线常见：`group_seq` / `group_by` / `trigger_index`
+  - 离线常见：`group_seq` / `group_by`
 - `balls`: `list[dict]`
 
 ### balls[*] 字段

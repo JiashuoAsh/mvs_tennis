@@ -54,7 +54,6 @@ class _FrameRec:
     serial: str
     cam_index: int
     frame_num: int
-    trigger_index: int
     dev_ts: int
     host_ts_raw: int | None
     host_ms_epoch: float | None
@@ -186,7 +185,6 @@ def _extract_frames_from_group(group: dict[str, Any]) -> list[_FrameRec]:
                 serial=serial,
                 cam_index=int(fr.get("cam_index", -1) or -1),
                 frame_num=int(fr.get("frame_num", -1) or -1),
-                trigger_index=int(fr.get("trigger_index", -1) or -1),
                 dev_ts=dev_ts,
                 host_ts_raw=host_ts_int,
                 host_ms_epoch=host_ms_epoch,
@@ -351,7 +349,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # --- 详细打印（前 N 组）---
         if gi < int(args.show_first):
-            print(f"\n[组 {gi}] group_by={g.get('group_by')} trigger_index={g.get('trigger_index')} group_seq={g.get('group_seq')}")
+            print(f"\n[组 {gi}] group_by={g.get('group_by')} group_seq={g.get('group_seq')}")
             if host_ms:
                 lo = min(host_ms.values())
                 hi = max(host_ms.values())

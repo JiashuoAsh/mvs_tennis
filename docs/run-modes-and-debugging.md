@@ -67,8 +67,8 @@ python -m mvs.apps.analyze_capture_run \
 - 网络丢包：`lost_packet_total == 0`
 - 出图频率：优先看 `arrival_fps_median`（比 `created_at` 更接近真实出图节拍）
 - 分组键诊断：
-  - 如果 `trigger_index_all_same=true`（例如恒为 0），不要使用 `--group-by trigger_index`
   - 建议保持采集默认 `frame_num` 分组
+  - 仅当你确认“不丢帧且触发节拍稳定”时，再尝试 `--group-by sequence`
 
 ### C) 常见现象对照
 

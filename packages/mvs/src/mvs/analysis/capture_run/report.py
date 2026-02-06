@@ -72,23 +72,10 @@ def render_report_text(computed: RunComputed) -> str:
     )
     lines.append("")
 
-    lines.append("[触发索引 trigger_index]")
-    lines.append(
-        f"- unique={summary.trigger_index_unique} range=[{summary.trigger_index_min}, {summary.trigger_index_max}] all_same={summary.trigger_index_all_same}"
-    )
-    lines.append(f"- trigger_* 目录数量: {summary.trigger_dirs}")
     if summary.group_dirs > 0:
+        lines.append("[输出目录结构]")
         lines.append(f"- group_* 目录数量: {summary.group_dirs}")
-    if group_by_values and any(x in {"frame_num", "sequence"} for x in group_by_values):
-        lines.append(
-            "- 说明：本次采集并非使用 trigger_index 作为分组键（metadata.jsonl 里记录了 group_by）。\n"
-            "  trigger_index 在此更多用于诊断：若恒为 0，不一定意味着组包失败，但意味着它不能作为严格同步证据。"
-        )
-    else:
-        lines.append(
-            "- 含义：理想情况下每次触发 trigger_index 会递增；如果恒为 0，说明该字段未提供有效分组信息（需要排查触发/机型/节点支持）。"
-        )
-    lines.append("")
+        lines.append("")
 
     lines.append("[图像格式]")
     lines.append(f"- width unique: {summary.width_unique}")

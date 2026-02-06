@@ -262,7 +262,7 @@ $$P = K [R_{wc}|t_{wc}]$$
 
 - 顶层字段：
 	- `created_at`: 处理时间（Unix epoch 秒）
-	- `meta...`: source 产出的组信息（在线常见 `group_index`；离线常见 `group_seq/group_by/trigger_index`）
+	- `meta...`: source 产出的组信息（在线常见 `group_index`；离线常见 `group_seq/group_by`）
 	- `balls`: 该同步组的 0..N 个球（跨视角几何一致才会输出）
 
 其中 `balls` 是列表，每个元素是一个 ball dict（按质量从高到低排序），常见字段：
@@ -280,7 +280,7 @@ $$P = K [R_{wc}|t_{wc}]$$
 meta 字段因 source 不同而不同：
 
 - 在线：包含 `group_index`
-- 离线：包含 `group_seq` / `group_by` / `trigger_index`（取决于 captures 的记录）
+- 离线：包含 `group_seq` / `group_by`（取决于 captures 的记录）
 
 ---
 
@@ -310,8 +310,9 @@ meta 字段因 source 不同而不同：
 1) **一定要接线**：master 输出线 → slave 触发输入线（例如 Line1 → Line0）。
 2) **一定要配置 master 的输出线信号源**：否则 slave 永远收不到触发。
 3) **组包键选择**：
-   - 如果相机支持且递增正常：优先 `--group-by trigger_index`
-   - 如果发现 `nTriggerIndex` 恒为 0：用 `--group-by frame_num`
+	- 默认使用 `--group-by frame_num`（推荐，兼容性最好）
+	- 在你确认“不丢帧且触发节拍稳定”时，可用 `--group-by sequence` 作为兜底
+	- 说明：历史版本曾尝试过其他分组字段，但因可靠性问题已从本仓库的分组键与输出 schema 中移除（历史数据里可能仍存在额外字段）
 
 ---
 

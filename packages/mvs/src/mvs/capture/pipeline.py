@@ -151,7 +151,7 @@ def open_quad_capture(
     timeout_ms: int = 1000,
     group_timeout_ms: int = 200,
     max_pending_groups: int = 256,
-    group_by: Literal["trigger_index", "frame_num", "sequence"] = "frame_num",
+    group_by: Literal["frame_num", "sequence"] = "frame_num",
     enable_soft_trigger_fps: float = 0.0,
     soft_trigger_serials: Sequence[str] = (),
     camera_event_names: Sequence[str] = (),
@@ -182,7 +182,7 @@ def open_quad_capture(
         timeout_ms: 单次取流等待超时（影响 Grabber 线程的响应速度）。
         group_timeout_ms: 分组等待超时。
         max_pending_groups: 最大待凑齐分组缓存数。
-        group_by: 分组键（默认 frame_num）。可选：trigger_index/frame_num/sequence。
+        group_by: 分组键（默认 frame_num）。可选：frame_num/sequence。
         enable_soft_trigger_fps: >0 时启用软触发循环（用于链路验证，不保证同曝光）。
         soft_trigger_serials: 指定哪些相机参与软触发；为空时会在“全部为 Software 触发”时默认全选。
         pixel_format: 可选像素格式（PixelFormat）。空字符串表示不设置。

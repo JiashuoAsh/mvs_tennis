@@ -20,7 +20,7 @@
 
 - ✅ **相机初始化**：SDK init/finalize、设备枚举、打开/关闭
 - ✅ **触发配置**：硬件外触发（Line0~3）、软触发（用于验证）、参数化配置
-- ✅ **严格同步**：按 `nTriggerIndex` 分组，确保 4 台同一时刻
+- ✅ **严格同步**：硬件触发链路保证同步曝光；软件侧按 `--group-by`（默认 `frame_num`，必要时 `sequence`）把多相机帧配对成同一个 group
 - ✅ **取流与处理**：异步 Grabber 线程、队列缓冲、FramePacket 数据结构
 - ✅ **时间戳**：设备 devtimestamp + 主机 hosttimestamp + 单调时钟 arrival
 - ✅ **保存与降级**：SDK BMP 保存（支持 Bayer→RGB）、失败自动降 RAW
@@ -104,7 +104,7 @@ python -m mvs.apps.quad_capture \
   --save-mode sdk-bmp --max-groups 1000
 ```
 
-**预期**：采集 1000 个同步组，每组 4 张 BMP，trigger_index 不重复。
+**预期**：采集 1000 个同步组，每组 4 张 BMP，且 `dropped_groups` 接近 0、`lost_packet` 接近 0。
 
 ### 案例 3：自定义处理（推理流程）
 
@@ -124,7 +124,7 @@ with open_quad_capture(binding, serials=[...]) as cap:
         results = inference_model(images)
 
         # 保存结果
-        save_results(results, trigger_index=group[0].trigger_index)
+      save_results(results, group_seq=_)
 ```
 
 ---
@@ -194,7 +194,7 @@ c:\Users\woan\Desktop\MVS_Deployment\
 
 1. **测试与验证**
    - 若有 4 台实际相机，运行 CLI 验证端到端流程
-   - 检查 metadata.jsonl 的 trigger_index 连续性和时间戳准确度
+   - 检查 metadata.jsonl 的组包完整性与时间戳准确度（例如 dev_timestamp/arrival_monotonic 分布）
 
 2. **性能调优**
    - 根据实际网络环境调整 `group_timeout_ms` 和 `max_pending_groups`

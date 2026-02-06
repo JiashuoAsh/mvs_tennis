@@ -19,7 +19,7 @@ from typing import Literal
 from mvs.capture.triggering import TriggerPlan
 
 
-GroupBy = Literal["trigger_index", "frame_num", "sequence"]
+GroupBy = Literal["frame_num", "sequence"]
 SaveMode = Literal["none", "sdk-bmp", "raw"]
 
 

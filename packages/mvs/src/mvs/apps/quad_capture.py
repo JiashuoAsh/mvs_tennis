@@ -5,8 +5,8 @@
 核心思路：
 - 相机端使用同一外触发输入（推荐硬件触发/分配器），保证“同一时刻”。
 - 上位机侧按 `--group-by` 选择分组键：
-    - 设备支持且递增正常时：优先用 `trigger_index`（更强的“同一次触发”证据）；
-    - 若你发现 `nTriggerIndex` 恒为 0：可用 `frame_num`（归一化帧号）或 `sequence`（进入分组器的顺序）。
+    - `frame_num`（归一化帧号）；
+    - `sequence`（进入分组器的顺序）。
 - 时间戳建议以设备时间戳 `nDevTimeStampHigh/Low` 为主，主机时间戳 `nHostTimeStamp` 仅用于诊断。
 
 注意：
@@ -189,15 +189,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--group-timeout-ms",
         type=int,
         default=1000,
-        help="同一 trigger_index 等待凑齐 N 台相机帧的超时",
+        help="同一分组键等待凑齐 N 台相机帧的超时",
     )
     parser.add_argument(
         "--group-by",
-        choices=["trigger_index", "frame_num", "sequence"],
+        choices=["frame_num", "sequence"],
         default="frame_num",
         help=(
-            "分组键：frame_num（默认；按帧号归一化分组，适用于 nTriggerIndex 恒为 0 的机型）；"
-            "trigger_index（设备支持且递增正常时推荐；用于更严格的同步证据与分组）；"
+            "分组键：frame_num（默认；按帧号归一化分组）；"
             "sequence（按进入分组器的帧序号分组，要求不丢帧且触发节拍一致）。"
         ),
     )

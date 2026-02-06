@@ -19,7 +19,7 @@ from tennis3d.trajectory import CurveStageConfig
 from .cli import _TERMINAL_PRINT_MODE
 
 
-_GROUP_BY = Literal["trigger_index", "frame_num", "sequence"]
+_GROUP_BY = Literal["frame_num", "sequence"]
 
 
 @dataclass(frozen=True, slots=True)

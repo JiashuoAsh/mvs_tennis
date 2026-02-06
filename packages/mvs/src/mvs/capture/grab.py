@@ -23,7 +23,6 @@ class FramePacket:
 
     cam_index: int
     serial: str
-    trigger_index: int
     frame_num: int
     dev_timestamp: int
     host_timestamp: int
@@ -105,7 +104,6 @@ class Grabber(threading.Thread):
                 pkt = FramePacket(
                     cam_index=self._cam_index,
                     serial=self._serial,
-                    trigger_index=int(info.nTriggerIndex),
                     frame_num=int(info.nFrameNum),
                     dev_timestamp=dev_ts,
                     host_timestamp=host_ts,
